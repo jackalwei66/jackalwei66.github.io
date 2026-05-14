@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台北美食街生存指南 | 現代都市觀察</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#fdf8f6',
+                            100: '#f2e8e5',
+                            500: '#e67e22',
+                            600: '#d35400',
+                            900: '#2c3e50',
+                        },
+                        accent: '#ff4757',
+                        glass: 'rgba(255, 255, 255, 0.7)',
+                    },
+                    fontFamily: {
+                        display: ['Outfit', 'Noto Sans TC', 'sans-serif'],
+                        body: ['Noto Sans TC', 'sans-serif'],
+                    },
+                    animation: {
+                        'fade-in-up': 'fadeInUp 0.8s ease-out forwards',
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        fadeInUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            line-height: 1.8;
+            overflow-x: hidden;
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .text-gradient {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #ea580c 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .gradient-border {
+            position: relative;
+        }
+        .gradient-border::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #f59e0b, transparent);
+        }
+        .prose h3 {
+            margin-top: 2.5rem;
+            margin-bottom: 1.25rem;
+            font-weight: 700;
+            color: #fbbf24;
+            display: flex;
+            align-items: center;
+        }
+        .prose h3::before {
+            content: '';
+            width: 8px;
+            height: 24px;
+            background: #f59e0b;
+            margin-right: 12px;
+            border-radius: 4px;
+        }
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+        }
+        @media (max-width: 768px) {
+            .bento-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body class="font-body selection:bg-orange-500/30">
+
+    <!-- Hero Section -->
+    <header class="relative h-screen min-h-[600px] flex items-center justify-center overflow-hidden">
+        <!-- Banner Image as Background -->
+        <div class="absolute inset-0 z-0">
+            <div class="absolute inset-0 bg-gradient-to-b from-slate-900/40 via-slate-900/80 to-slate-950 z-10"></div>
+            <div class="w-full h-full scale-110 motion-safe:animate-[pulse_8s_infinite] opacity-60">
+                <img src='https://opal.google/board/blobs/6019d4c4-7b49-4525-89a5-8baf73bf55bc' alt='Taipei Food Court' class="w-full h-full object-cover" />
+            </div>
+        </div>
+
+        <div class="relative z-20 container mx-auto px-6 text-center animate-fade-in-up">
+            <div class="inline-block px-4 py-1.5 mb-6 rounded-full border border-orange-500/30 bg-orange-500/10 text-orange-400 text-sm font-semibold tracking-wider uppercase">
+                Urban Exploration · M11416117
+            </div>
+            <h1 class="text-4xl md:text-6xl lg:text-7xl font-display font-extrabold mb-8 tracking-tight leading-tight">
+                【台北美食街生存指南】<br/>
+                <span class="text-gradient">從路邊攤到冷氣天堂</span>
+            </h1>
+            <p class="max-w-2xl mx-auto text-lg md:text-xl text-slate-300 font-light italic">
+                「這不只是吃飯，更是一場關於味蕾的華麗冒險。」
+            </p>
+            
+            <div class="mt-12 animate-bounce">
+                <svg class="w-6 h-6 mx-auto text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                </svg>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-6 py-20">
+        <!-- Intro Quote -->
+        <section class="max-w-4xl mx-auto mb-24">
+            <div class="glass-card p-8 md:p-12 rounded-3xl relative overflow-hidden group">
+                <div class="absolute -top-10 -right-10 w-40 h-40 bg-orange-500/10 rounded-full blur-3xl group-hover:bg-orange-500/20 transition-colors duration-500"></div>
+                <p class="text-xl md:text-2xl text-slate-200 leading-relaxed relative z-10">
+                    作為一個長期穿梭在水泥叢林的台北觀察者，我常在想：是什麼支撐著這座城市的運作？是捷運的路網、是密集得驚人的便利商店，還是那些藏在各大建築深處、充滿煙火氣的「美食街」？
+                </p>
+                <div class="mt-8 border-t border-slate-700 pt-8 text-slate-400">
+                    很多人對美食街的評價很兩極，但我卻在那錯落的坐席間，看見了台北人特有的溫柔與效率。今天，讓我們用一點點哲學的眼光，來拆解這場關於味蕾的華麗冒險。
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 1: Four Sects -->
+        <section class="mb-32">
+            <h2 class="text-3xl md:text-4xl font-display font-bold mb-12 flex items-center gap-4">
+                <span class="bg-orange-500 text-slate-900 px-3 py-1 rounded-lg">01</span>
+                四大門派的空間政治學
+            </h2>
+            
+            <div class="bento-grid">
+                <div class="md:col-span-2 glass-card p-8 rounded-3xl hover:border-orange-500/50 transition-all duration-300 group">
+                    <div class="text-orange-500 mb-4 flex items-center justify-between">
+                        <span class="font-bold tracking-tighter text-xl uppercase">The Elite</span>
+                        <svg class="w-6 h-6 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
+                    </div>
+                    <h4 class="text-2xl font-bold mb-4">百貨優雅派</h4>
+                    <p class="text-slate-400">新光三越、101。這是貴婦或逛街族行程後的「電力補給站」。這裡的空氣溢滿了剛從精品店帶出的餘溫，享受被精緻擺盤包裝過的常民小吃。一種「用價格換取體面」的用餐儀式。</p>
+                </div>
+                
+                <div class="md:col-span-2 glass-card p-8 rounded-3xl hover:border-blue-400/50 transition-all duration-300 group">
+                    <div class="text-blue-400 mb-4 flex items-center justify-between">
+                        <span class="font-bold tracking-tighter text-xl uppercase">The Velocity</span>
+                        <svg class="w-6 h-6 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
+                    </div>
+                    <h4 class="text-2xl font-bold mb-4">通勤時空門</h4>
+                    <p class="text-slate-400">北車、捷運地下街。時間是唯一的度量衡。看著人群在轉車空檔餵飽靈魂，那是一種與時間賽跑的藝術。老車站也能擁有令人驚豔的現代味覺。</p>
+                </div>
+
+                <div class="md:col-span-1 glass-card p-8 rounded-3xl hover:border-emerald-400/50 transition-all duration-300">
+                    <div class="text-emerald-400 mb-4 font-bold tracking-tighter text-sm uppercase">Community</div>
+                    <h4 class="text-xl font-bold mb-3">社區守護神</h4>
+                    <p class="text-slate-400 text-sm">家樂福、大潤發。穿著夾腳拖走進自家客廳。主打平價與親民，是城市鄰里的核心能量來源。</p>
+                </div>
+
+                <div class="md:col-span-3 glass-card p-8 rounded-3xl hover:border-purple-400/50 transition-all duration-300 bg-gradient-to-br from-slate-800/50 to-purple-900/20">
+                    <div class="text-purple-400 mb-4 font-bold tracking-tighter text-sm uppercase">The Fusion</div>
+                    <h4 class="text-2xl font-bold mb-3">老靈魂新衣裳</h4>
+                    <p class="text-slate-400">南門市場、華山市場。傳承數十年的老店搬進了明亮的冷氣房，傳統與現代在同一個空間交織。南門市場的改建，證明了「時髦」與「台味」可以並行不悖。</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Timeline -->
+        <section class="mb-32 relative">
+            <div class="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-px bg-slate-800 hidden md:block"></div>
+            
+            <h2 class="text-3xl md:text-4xl font-display font-bold mb-20 text-center relative z-10">
+                <span class="px-6 py-2 bg-slate-950 border border-slate-800 rounded-full">穿越時光機：成年禮</span>
+            </h2>
+
+            <div class="space-y-24">
+                <!-- 1950-70 -->
+                <div class="relative flex flex-col md:flex-row items-center group">
+                    <div class="md:w-1/2 md:pr-12 text-center md:text-right">
+                        <span class="text-6xl font-black text-slate-800 absolute -top-10 right-10 md:right-auto md:left-10 opacity-20 select-none">1950s</span>
+                        <h4 class="text-2xl font-bold text-orange-400 mb-4">草根的熱力</h4>
+                        <p class="text-slate-400">那是一個「看天吃飯」的年代。廟口與路邊攤散發著原始動力，但也必須隨時與暑熱、蒼蠅以及路邊的廢氣搏鬥。</p>
+                    </div>
+                    <div class="w-12 h-12 bg-orange-500 rounded-full border-4 border-slate-950 z-10 my-8 md:my-0 shadow-[0_0_20px_rgba(249,115,22,0.5)]"></div>
+                    <div class="md:w-1/2 md:pl-12"></div>
+                </div>
+
+                <!-- 80-90 -->
+                <div class="relative flex flex-col md:flex-row-reverse items-center group">
+                    <div class="md:w-1/2 md:pl-12 text-center md:text-left">
+                        <span class="text-6xl font-black text-slate-800 absolute -top-10 left-10 md:left-auto md:right-10 opacity-20 select-none">1980s</span>
+                        <h4 class="text-2xl font-bold text-blue-400 mb-4">空間治理的新篇章</h4>
+                        <p class="text-slate-400">政府推動「小吃地底化」。士林夜市與建成圓環的改建，不只是搬家，而是一種城市品質的集體升級與空間規範化。</p>
+                    </div>
+                    <div class="w-12 h-12 bg-blue-500 rounded-full border-4 border-slate-950 z-10 my-8 md:my-0 shadow-[0_0_20px_rgba(59,130,246,0.5)]"></div>
+                    <div class="md:w-1/2 md:pr-12"></div>
+                </div>
+
+                <!-- 2000+ -->
+                <div class="relative flex flex-col md:flex-row items-center group">
+                    <div class="md:w-1/2 md:pr-12 text-center md:text-right">
+                        <span class="text-6xl font-black text-slate-800 absolute -top-10 right-10 md:right-auto md:left-10 opacity-20 select-none">2000+</span>
+                        <h4 class="text-2xl font-bold text-emerald-400 mb-4">噴泉效應的核心</h4>
+                        <p class="text-slate-400">美食街從配角一躍成為「聚客吸鐵」。人流像噴泉一樣湧向其他樓層，美食街已是商圈生存最強大的經濟引擎。</p>
+                    </div>
+                    <div class="w-12 h-12 bg-emerald-500 rounded-full border-4 border-slate-950 z-10 my-8 md:my-0 shadow-[0_0_20px_rgba(16,185,129,0.5)]"></div>
+                    <div class="md:w-1/2 md:pl-12"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: Dialectical Thinking -->
+        <section class="mb-32">
+            <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-[3rem] p-8 md:p-16 border border-slate-700 shadow-2xl">
+                <h2 class="text-3xl md:text-4xl font-display font-bold mb-16 text-center">辯證思考：我們在便利中失去了什麼？</h2>
+                
+                <div class="grid md:grid-cols-2 gap-12">
+                    <!-- Pros -->
+                    <div class="space-y-8">
+                        <div class="flex items-center gap-3 text-emerald-400 font-bold text-lg mb-4">
+                            <span class="w-8 h-8 rounded-full bg-emerald-400/20 flex items-center justify-center">✓</span>
+                            為什麼我們無法拒絕？
+                        </div>
+                        <ul class="space-y-6">
+                            <li class="flex gap-4">
+                                <div class="shrink-0 text-emerald-500 font-bold">01</div>
+                                <div>
+                                    <h5 class="font-bold text-slate-200">選擇困難症的療癒</h5>
+                                    <p class="text-sm text-slate-400">台、日、韓、泰、美式齊聚，解決團隊用餐的爭執。</p>
+                                </div>
+                            </li>
+                            <li class="flex gap-4">
+                                <div class="shrink-0 text-emerald-500 font-bold">02</div>
+                                <div>
+                                    <h5 class="font-bold text-slate-200">極端氣候的避風港</h5>
+                                    <p class="text-sm text-slate-400">夏日燠熱與冬日陰雨，提供了最穩定的物理避護。</p>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Cons -->
+                    <div class="space-y-8">
+                        <div class="flex items-center gap-3 text-red-400 font-bold text-lg mb-4">
+                            <span class="w-8 h-8 rounded-full bg-red-400/20 flex items-center justify-center">!</span>
+                            那些值得反思的副作用
+                        </div>
+                        <ul class="space-y-6">
+                            <li class="flex gap-4">
+                                <div class="shrink-0 text-red-500 font-bold">01</div>
+                                <div>
+                                    <h5 class="font-bold text-slate-200">城市同質化現象</h5>
+                                    <p class="text-sm text-slate-400">「複製貼上」的品牌，逐漸侵蝕著城市獨特的小店靈魂。</p>
+                                </div>
+                            </li>
+                            <li class="flex gap-4">
+                                <div class="shrink-0 text-red-500 font-bold">02</div>
+                                <div>
+                                    <h5 class="font-bold text-slate-200">15% 便利稅</h5>
+                                    <p class="text-sm text-slate-400">高租金下，餐點變貴、份量縮水，成了標準化下的犧牲。</p>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 4: Future -->
+        <section class="mb-32">
+            <h2 class="text-3xl md:text-4xl font-display font-bold mb-12 text-center">未來進化賽：科技與質感的融合</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Tech -->
+                <div class="glass-card p-6 rounded-2xl border-t-4 border-t-blue-500 group hover:-translate-y-2 transition-all">
+                    <div class="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-500 mb-6 group-hover:scale-110 transition-transform">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    </div>
+                    <h5 class="text-xl font-bold mb-3">科技賦能</h5>
+                    <p class="text-slate-400 text-sm">人類與機器人協作，自助點餐成為標配，讓進食過程更高效。 </p>
+                </div>
+
+                <!-- Studio -->
+                <div class="glass-card p-6 rounded-2xl border-t-4 border-t-purple-500 group hover:-translate-y-2 transition-all">
+                    <div class="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center text-purple-500 mb-6 group-hover:scale-110 transition-transform">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
+                    </div>
+                    <h5 class="text-xl font-bold mb-3">空間策展化</h5>
+                    <p class="text-slate-400 text-sm">不僅是桌椅，而是沉浸式影棚。走進 50 年代眷村，或隱入一片原始森林。</p>
+                </div>
+
+                <!-- Green -->
+                <div class="glass-card p-6 rounded-2xl border-t-4 border-t-emerald-500 group hover:-translate-y-2 transition-all">
+                    <div class="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-500 mb-6 group-hover:scale-110 transition-transform">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    </div>
+                    <h5 class="text-xl font-bold mb-3">綠色與永續</h5>
+                    <p class="text-slate-400 text-sm">零免洗餐具、精密的廚餘循環系統，減少給地球帶來的負擔。</p>
+                </div>
+
+                <!-- Michelin -->
+                <div class="glass-card p-6 rounded-2xl border-t-4 border-t-orange-500 group hover:-translate-y-2 transition-all">
+                    <div class="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center text-orange-500 mb-6 group-hover:scale-110 transition-transform">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.382-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>
+                    </div>
+                    <h5 class="text-xl font-bold mb-3">米其林的降臨</h5>
+                    <p class="text-slate-400 text-sm">摘星名店進駐，拉高天花板。在熙來攘往中撞見星級的驚喜。</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Final Thoughts -->
+        <section class="max-w-3xl mx-auto py-20 text-center">
+            <h2 class="text-3xl font-display font-bold mb-8">結語：在繁華中見溫柔</h2>
+            <div class="relative">
+                <span class="absolute -top-10 -left-10 text-8xl text-orange-500/10 font-serif">“</span>
+                <p class="text-xl text-slate-300 relative z-10 leading-relaxed italic">
+                    在這座求新、求快、求變的台北，美食街其實就是這座城市「兼容並蓄」的縮影。它不只是為了解決生理飢餓，更是便利、舒適與現代文明的一場交匯。
+                </p>
+                <p class="mt-8 text-lg text-slate-400">
+                    它或許不夠獨特，但在忙碌的一天結束後，能在一盞明亮的燈火下，吹著冷氣、喝著熱湯，那一刻，美食街就是這座城市給予我們最平凡、也最溫柔的擁抱。
+                </p>
+                <span class="absolute -bottom-20 -right-10 text-8xl text-orange-500/10 font-serif rotate-180">“</span>
+            </div>
+            
+            <div class="mt-20 pt-10 border-t border-slate-800 flex flex-col items-center">
+                <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-orange-500 to-accent p-1 mb-4">
+                    <div class="w-full h-full rounded-full bg-slate-950 flex items-center justify-center font-display font-bold text-xl">M</div>
+                </div>
+                <p class="text-slate-500 text-sm tracking-widest uppercase">Author: M11416117</p>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Smooth reveal animations on scroll
+        const observerOptions = {
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('animate-fade-in-up');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('section').forEach(section => {
+            section.style.opacity = "0";
+            observer.observe(section);
+        });
+    </script>
+</body>
+</html>
