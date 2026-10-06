@@ -222,8 +222,18 @@ function analyze(name, wb){
     }
   }
   if (!best) return {name, role:"skip", headers:[], rows:[]};
-  const rows = best.aoa.slice(best.headerRow + 1).filter(r => r.some(v => String(v ?? "").trim() !== ""));
-  return {name, role: best.score >= 6 ? best.role : "skip", sheet:best.sheet, headers:best.headers, rows};
+  const nonEmpty = r => r.some(v => String(v ?? "").trim() !== "");
+  const rows = best.aoa.slice(best.headerRow + 1).filter(nonEmpty);
+  // Also take rows from other sheets that use the same header row (e.g. one sheet per month).
+  const sig = best.headers.map(N).join("|").replace(/\|+$/, ""), sheets = [best.sheet];
+  for (const sn of wb.SheetNames){
+    if (sn === best.sheet) continue;
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, raw:true, defval:""});
+    for (let r = 0; r < Math.min(30, aoa.length); r++){
+      if (aoa[r].map(v => N(String(v ?? "").trim())).join("|").replace(/\|+$/, "") === sig){ rows.push(...aoa.slice(r + 1).filter(nonEmpty)); sheets.push(sn); break; }
+    }
+  }
+  return {name, role: best.score >= 6 ? best.role : "skip", sheet:sheets.join("、"), headers:best.headers, rows};
 }
 
 /* ---------- reject classification ---------- */
@@ -460,7 +470,7 @@ $("runBtn").onclick = () => {
     try{
       result = processAll(files);
       isSample = files.some(f => f.sample);
-      activeTab = 0; renderResults();
+      activeTab = 0; renderResults(); prepareDownloads();
       setStatus(`完成：${result.kpi.total} 筆明細，產生 ${result.sheets.length} 個分頁、${result.csvs.length} 個 CSV。` + (result.kpi.warn.length ? `（${result.kpi.warn.join("、")}，相關修正已略過）` : ""));
     }catch(e){ console.error(e); setStatus(e.message || String(e), true); }
   }, 30);
@@ -474,9 +484,6 @@ function renderResults(){
     ["明細筆數", k.total, ""], ["Accepted 金額", money(k.acc), "ok"], ["Rejected 金額", money(k.rej), "bad"],
     ["已自動修正", k.fixed, "flag"], ["需新增 Debit", k.csv, ""]
   ].map(([l, v, c]) => `<div class="kpi ${c}"><div class="l">${l}</div><div class="v">${v}</div></div>`).join("");
-  $("dlCsv").disabled = !r.csvs.length;
-  $("dlCsv").textContent = r.csvs.length ? `⬇ 下載 CSV 檔（${r.csvs.length} 個，ZIP）` : "無需產生 CSV";
-  $("dlStatus").textContent = "";
   const tabs = $("tabs"); tabs.innerHTML = "";
   r.sheets.forEach((s, i) => {
     const b = document.createElement("button"); b.className = "tab"; b.type = "button"; b.setAttribute("role", "tab");
@@ -541,20 +548,38 @@ function buildXlsx(){
 }
 const toCsv = aoa => "﻿" + aoa.map(r => r.map(v => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }).join(",")).join("\r\n");
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-$("dlXlsx").onclick = async () => { if (!result) return;
-  let blob;
-  try{ blob = new Blob([buildXlsx()], {type:XLSX_MIME}); }
-  catch(e){ console.error(e); $("dlStatus").textContent = "產生 Excel 失敗：" + (e.message || e); return; }
-  try{ showDl(await saveFile(`DIODES_POS_${result.todayS}.xlsx`, blob)); }
+/* Build the files right after processing, so a click only hands over a finished file. */
+let ready = {xlsx:null, zip:null, xlsxErr:null, zipErr:null, token:0};
+async function prepareDownloads(){
+  const token = ++ready.token;
+  ready = {xlsx:null, zip:null, xlsxErr:null, zipErr:null, token};
+  const bx = $("dlXlsx"), bc = $("dlCsv");
+  bx.disabled = true; bx.textContent = "⏳ 產生 Excel 檔中…";
+  bc.disabled = true; bc.textContent = result.csvs.length ? "⏳ 產生 CSV 檔中…" : "無需產生 CSV";
+  $("dlStatus").textContent = `共 ${result.kpi.total} 筆，資料量大時需要幾秒鐘，請稍候。`;
+  await new Promise(r => setTimeout(r, 60));
+  try{ const t = performance.now(); const x = new Blob([buildXlsx()], {type:XLSX_MIME});
+    if (token !== ready.token) return; ready.xlsx = x; console.log("[dar] xlsx built", Math.round(performance.now() - t) + "ms", x.size + " bytes"); }
+  catch(e){ console.error(e); ready.xlsxErr = e; }
+  if (result.csvs.length){
+    try{ if (!window.JSZip) throw new Error("ZIP 元件沒有載入成功，請重新整理頁面");
+      const zip = new JSZip(); result.csvs.forEach(c => zip.file(c.name, toCsv(c.aoa)));
+      const z = new Blob([await zip.generateAsync({type:"uint8array"})], {type:"application/zip"});
+      if (token !== ready.token) return; ready.zip = z; }
+    catch(e){ console.error(e); ready.zipErr = e; }
+  }
+  if (token !== ready.token) return;
+  bx.disabled = !ready.xlsx; bx.textContent = ready.xlsx ? `⬇ 下載 Excel 結果（${Math.max(1, Math.round(ready.xlsx.size / 1024))} KB）` : "Excel 產生失敗";
+  if (result.csvs.length){ bc.disabled = !ready.zip; bc.textContent = ready.zip ? `⬇ 下載 CSV 檔（${result.csvs.length} 個，ZIP）` : "CSV 產生失敗"; }
+  $("dlStatus").textContent = ready.xlsxErr ? "產生 Excel 失敗：" + (ready.xlsxErr.message || ready.xlsxErr)
+    : ready.zipErr ? "產生 CSV 失敗：" + (ready.zipErr.message || ready.zipErr) : "檔案已準備好，可以下載。";
+}
+$("dlXlsx").onclick = async () => { if (!result || !ready.xlsx) return;
+  try{ showDl(await saveFile(`DIODES_POS_${result.todayS}.xlsx`, ready.xlsx)); }
   catch(e){ console.error(e); $("dlStatus").textContent = "下載失敗：" + (e.message || e); } };
-$("dlCsv").onclick = async () => { if (!result || !result.csvs.length) return; $("dlStatus").textContent = "壓縮 CSV 中…";
-  try{
-    let blob;
-    if (window.JSZip){ const zip = new JSZip(); result.csvs.forEach(c => zip.file(c.name, toCsv(c.aoa)));
-      blob = new Blob([await zip.generateAsync({type:"uint8array"})], {type:"application/zip"}); }
-    else throw new Error("ZIP 元件沒有載入成功，請重新整理頁面");
-    showDl(await saveFile(`DIODES_CSV_${result.todayS}.zip`, blob));
-  }catch(e){ console.error(e); $("dlStatus").textContent = "下載失敗：" + (e.message || e); } };
+$("dlCsv").onclick = async () => { if (!result || !ready.zip) return;
+  try{ showDl(await saveFile(`DIODES_CSV_${result.todayS}.zip`, ready.zip)); }
+  catch(e){ console.error(e); $("dlStatus").textContent = "下載失敗：" + (e.message || e); } };
 
 /* ---------- sample data (clearly marked as 範例) ---------- */
 function sampleFiles(){
