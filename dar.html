@@ -207,8 +207,16 @@ function mapCols(headers, schema){
   }
   return out;
 }
+/* Recompute a sheet's range from the cells that actually hold data; formatting alone can stretch !ref to column XFD. */
+function fixRef(ws){
+  let maxR = -1, maxC = -1;
+  for (const k in ws){ if (k[0] === "!") continue; const c = ws[k]; if (!c || c.v === undefined || c.v === null || c.v === "") continue;
+    const a = XLSX.utils.decode_cell(k); if (a.r > maxR) maxR = a.r; if (a.c > maxC) maxC = a.c; }
+  if (maxR >= 0) ws["!ref"] = XLSX.utils.encode_range({s:{r:0, c:0}, e:{r:maxR, c:maxC}});
+}
 function analyze(name, wb){
   let best = null;
+  for (const sn of wb.SheetNames) fixRef(wb.Sheets[sn]);
   for (const sn of wb.SheetNames){
     const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, raw:true, defval:""});
     for (let r = 0; r < Math.min(30, aoa.length); r++){
@@ -222,15 +230,19 @@ function analyze(name, wb){
     }
   }
   if (!best) return {name, role:"skip", headers:[], rows:[]};
+  // Drop trailing columns with no header (sheets formatted out to column XFD would otherwise be read in full).
+  let last = best.headers.length - 1; while (last >= 0 && !best.headers[last]) last--;
+  const W = last + 1; best.headers = best.headers.slice(0, W);
   const nonEmpty = r => r.some(v => String(v ?? "").trim() !== "");
-  const rows = best.aoa.slice(best.headerRow + 1).filter(nonEmpty);
+  const cut = r => r.length > W ? r.slice(0, W) : r;
+  const rows = best.aoa.slice(best.headerRow + 1).filter(nonEmpty).map(cut);
   // Also take rows from other sheets that use the same header row (e.g. one sheet per month).
   const sig = best.headers.map(N).join("|").replace(/\|+$/, ""), sheets = [best.sheet];
   for (const sn of wb.SheetNames){
     if (sn === best.sheet) continue;
     const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, raw:true, defval:""});
     for (let r = 0; r < Math.min(30, aoa.length); r++){
-      if (aoa[r].map(v => N(String(v ?? "").trim())).join("|").replace(/\|+$/, "") === sig){ rows.push(...aoa.slice(r + 1).filter(nonEmpty)); sheets.push(sn); break; }
+      if (aoa[r].map(v => N(String(v ?? "").trim())).join("|").replace(/\|+$/, "") === sig){ for (const x of aoa.slice(r + 1)) if (nonEmpty(x)) rows.push(cut(x)); sheets.push(sn); break; }
     }
   }
   return {name, role: best.score >= 6 ? best.role : "skip", sheet:sheets.join("、"), headers:best.headers, rows};
@@ -534,17 +546,30 @@ async function saveFile(filename, blob){
   return directDownload(filename, blob);
 }
 const showDl = msg => { if (msg !== null) $("dlStatus").textContent = msg; };
+const cleanCell = v => {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "number") return isFinite(v) ? v : "";
+  if (typeof v === "boolean") return v;
+  if (v instanceof Date) return isNaN(v) ? "" : fmtD(v);
+  const s = typeof v === "object" ? (v.w || v.v || JSON.stringify(v)) : String(v);
+  return String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").slice(0, 32000);
+};
+let xlsxSkipped = [];
 function buildXlsx(){
-  const wb = XLSX.utils.book_new(), used = new Set();
+  const wb = XLSX.utils.book_new(), used = new Set(); xlsxSkipped = [];
   for (const s of result.sheets){
-    const ws = XLSX.utils.aoa_to_sheet(s.aoa);
+   try{
+    const ws = XLSX.utils.aoa_to_sheet(s.aoa.map(r => Array.from(r, cleanCell)));
     s.aoa[0].forEach((_, c) => { const a = XLSX.utils.encode_cell({r:0, c}); if (ws[a]) ws[a].s = {font:{bold:true}, fill:{fgColor:{rgb:"DCE3F2"}}}; });
     for (const [r, c] of s.hl){ const a = XLSX.utils.encode_cell({r, c}); if (!ws[a]) ws[a] = {t:"s", v:""}; ws[a].s = {fill:{patternType:"solid", fgColor:{rgb:"FFFF00"}}}; }
     ws["!cols"] = s.aoa[0].map((h, c) => ({wch: Math.min(40, Math.max(8, String(h).length + 2, ...s.aoa.slice(1, 50).map(r => String(r[c] ?? "").length + 1)))}));
-    let n = s.name.replace(/[\\\/?*\[\]:]/g, "_").slice(0, 31), i = 2; while (used.has(n)) n = s.name.slice(0, 28) + "_" + i++; used.add(n);
+    const base = (String(s.name).replace(/[\\\/?*\[\]:']/g, "_").trim() || "Sheet").slice(0, 31);
+    let n = base, i = 2; while (used.has(n.toUpperCase())) n = base.slice(0, 27) + "_" + i++; used.add(n.toUpperCase());
     XLSX.utils.book_append_sheet(wb, ws, n);
+   }catch(e){ console.error("[dar] sheet failed:", s.name, e); xlsxSkipped.push(`${s.name}（${e.message || e}）`); }
   }
-  return XLSX.write(wb, {bookType:"xlsx", type:"array"});
+  if (!wb.SheetNames.length) throw new Error("所有分頁都無法寫入：" + xlsxSkipped.join("；"));
+  return XLSX.write(wb, {bookType:"xlsx", type:"array", compression:true});
 }
 const toCsv = aoa => "﻿" + aoa.map(r => r.map(v => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }).join(",")).join("\r\n");
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -572,7 +597,8 @@ async function prepareDownloads(){
   bx.disabled = !ready.xlsx; bx.textContent = ready.xlsx ? `⬇ 下載 Excel 結果（${Math.max(1, Math.round(ready.xlsx.size / 1024))} KB）` : "Excel 產生失敗";
   if (result.csvs.length){ bc.disabled = !ready.zip; bc.textContent = ready.zip ? `⬇ 下載 CSV 檔（${result.csvs.length} 個，ZIP）` : "CSV 產生失敗"; }
   $("dlStatus").textContent = ready.xlsxErr ? "產生 Excel 失敗：" + (ready.xlsxErr.message || ready.xlsxErr)
-    : ready.zipErr ? "產生 CSV 失敗：" + (ready.zipErr.message || ready.zipErr) : "檔案已準備好，可以下載。";
+    : ready.zipErr ? "產生 CSV 失敗：" + (ready.zipErr.message || ready.zipErr)
+    : xlsxSkipped.length ? "檔案已準備好，但以下分頁無法寫入：" + xlsxSkipped.join("；") : "檔案已準備好，可以下載。";
 }
 $("dlXlsx").onclick = async () => { if (!result || !ready.xlsx) return;
   try{ showDl(await saveFile(`DIODES_POS_${result.todayS}.xlsx`, ready.xlsx)); }
