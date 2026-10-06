@@ -502,19 +502,31 @@ function renderTable(s){
 }
 
 /* ---------- downloads ---------- */
+const inClaude = !!(window.claude && window.claude.use);
 let dlCap = null;
-const dlReady = (async () => { try{ if (window.claude && window.claude.use) dlCap = await window.claude.use("downloads"); }catch(e){} })();
-async function saveFile(filename, data){
-  await Promise.race([dlReady, new Promise(r => setTimeout(r, 1500))]);
+if (inClaude) (async () => { try{ dlCap = await window.claude.use("downloads"); }catch(e){} })();
+let lastUrl = null;
+/* Plain websites (GitHub Pages): download immediately inside the click, and also leave a visible link as a backup. */
+function directDownload(filename, blob){
+  if (lastUrl) URL.revokeObjectURL(lastUrl);
+  lastUrl = URL.createObjectURL(blob);
+  if (window.navigator && window.navigator.msSaveOrOpenBlob){ window.navigator.msSaveOrOpenBlob(blob, filename); }
+  else { const a = document.createElement("a"); a.href = lastUrl; a.download = filename; a.rel = "noopener";
+    document.body.appendChild(a); a.click(); a.remove(); }
+  const st = $("dlStatus"); st.textContent = "";
+  st.append("已開始下載。沒看到檔案的話，請點：");
+  const link = document.createElement("a"); link.href = lastUrl; link.download = filename; link.textContent = filename;
+  link.style.cssText = "color:var(--accent);font-weight:700;word-break:break-all"; st.append(link);
+  return null;
+}
+async function saveFile(filename, blob){
   if (dlCap){
-    try{ await dlCap.save({filename, data}); return "已下載"; }
+    try{ await dlCap.save({filename, data:blob}); return "已下載"; }
     catch(e){ if (e && e.code === "declined") return "已取消下載"; if (e && e.code === "rate_limited") return "下載視窗已開啟，請先完成或關閉它"; }
   }
-  const blob = data instanceof Blob ? data : new Blob([data]);
-  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename;
-  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
-  return "已下載";
+  return directDownload(filename, blob);
 }
+const showDl = msg => { if (msg !== null) $("dlStatus").textContent = msg; };
 function buildXlsx(){
   const wb = XLSX.utils.book_new(), used = new Set();
   for (const s of result.sheets){
@@ -528,14 +540,21 @@ function buildXlsx(){
   return XLSX.write(wb, {bookType:"xlsx", type:"array"});
 }
 const toCsv = aoa => "﻿" + aoa.map(r => r.map(v => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }).join(",")).join("\r\n");
-$("dlXlsx").onclick = async () => { if (!result) return; $("dlStatus").textContent = "準備檔案中…";
-  try{ $("dlStatus").textContent = await saveFile(`DIODES_POS_處理結果_${result.todayS}.xlsx`, new Blob([buildXlsx()])); }
-  catch(e){ $("dlStatus").textContent = "下載失敗：" + (e.message || e); } };
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+$("dlXlsx").onclick = async () => { if (!result) return;
+  let blob;
+  try{ blob = new Blob([buildXlsx()], {type:XLSX_MIME}); }
+  catch(e){ console.error(e); $("dlStatus").textContent = "產生 Excel 失敗：" + (e.message || e); return; }
+  try{ showDl(await saveFile(`DIODES_POS_${result.todayS}.xlsx`, blob)); }
+  catch(e){ console.error(e); $("dlStatus").textContent = "下載失敗：" + (e.message || e); } };
 $("dlCsv").onclick = async () => { if (!result || !result.csvs.length) return; $("dlStatus").textContent = "壓縮 CSV 中…";
-  try{ const zip = new JSZip(); result.csvs.forEach(c => zip.file(c.name, toCsv(c.aoa)));
-    const blob = await zip.generateAsync({type:"blob"});
-    $("dlStatus").textContent = await saveFile(`DIODES_CSV_${result.todayS}.zip`, blob); }
-  catch(e){ $("dlStatus").textContent = "下載失敗：" + (e.message || e); } };
+  try{
+    let blob;
+    if (window.JSZip){ const zip = new JSZip(); result.csvs.forEach(c => zip.file(c.name, toCsv(c.aoa)));
+      blob = new Blob([await zip.generateAsync({type:"uint8array"})], {type:"application/zip"}); }
+    else throw new Error("ZIP 元件沒有載入成功，請重新整理頁面");
+    showDl(await saveFile(`DIODES_CSV_${result.todayS}.zip`, blob));
+  }catch(e){ console.error(e); $("dlStatus").textContent = "下載失敗：" + (e.message || e); } };
 
 /* ---------- sample data (clearly marked as 範例) ---------- */
 function sampleFiles(){
