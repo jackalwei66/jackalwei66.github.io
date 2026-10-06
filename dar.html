@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>達爾資料庫處理網站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: masthead → upload + run panel → result bar (KPIs + download) → tabbed sheet preview */
+:root{
+  --bg:#f2f4f7; --surface:#ffffff; --ink:#1d2433; --muted:#5b6476; --line:#d9dee7;
+  --accent:#2a3f7a; --accent-ink:#ffffff; --accent-soft:#e6eaf5;
+  --flag:#fff2a8; --flag-ink:#5a4a00; --ok:#1f7a4d; --ok-soft:#e2f3ea; --bad:#b4372f; --bad-soft:#fbe7e5;
+  --f-display:"Noto Serif TC","Songti TC",serif; --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121620; --surface:#1a2030; --ink:#e7eaf1; --muted:#9aa3b6; --line:#2c3446;
+  --accent:#8fa6ea; --accent-ink:#10162a; --accent-soft:#232c45;
+  --flag:#4d4410; --flag-ink:#fff2a8; --ok:#6fd3a0; --ok-soft:#173527; --bad:#f08a80; --bad-soft:#3d1f1d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121620; --surface:#1a2030; --ink:#e7eaf1; --muted:#9aa3b6; --line:#2c3446;
+  --accent:#8fa6ea; --accent-ink:#10162a; --accent-soft:#232c45;
+  --flag:#4d4410; --flag-ink:#fff2a8; --ok:#6fd3a0; --ok-soft:#173527; --bad:#f08a80; --bad-soft:#3d1f1d; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:0 48px}
+header.mast{border-bottom:3px solid var(--accent);background:var(--surface)}
+header.mast .wrap{padding-block:22px 18px;display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 24px}
+h1{font-family:var(--f-display);font-weight:900;font-size:clamp(26px,4vw,36px);margin:0;letter-spacing:.04em;text-wrap:balance}
+.mast small{color:var(--muted);font-size:13px}
+.mast .tag{font-family:var(--f-mono);font-size:12px;color:var(--muted);letter-spacing:.06em}
+h2{font-size:17px;margin:0 0 4px;font-weight:700}
+.sub{color:var(--muted);font-size:13px;margin:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px;margin-top:22px}
+.grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:20px}
+@media (max-width:820px){.grid{grid-template-columns:minmax(0,1fr)}}
+.drop{margin-top:14px;border:2px dashed var(--line);border-radius:10px;padding:26px 16px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.over,.drop:focus-visible{border-color:var(--accent);background:var(--accent-soft);outline:none}
+.drop b{display:block;font-size:16px}
+.drop span{color:var(--muted);font-size:13px}
+.files{list-style:none;padding:0;margin:14px 0 0;display:flex;flex-direction:column;gap:8px}
+.files li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px}
+.files .fn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.files .meta{color:var(--muted);font-size:12px;font-family:var(--f-mono)}
+select,button{font:inherit}
+select{padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font-size:13px}
+.x{border:0;background:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:2px 6px;border-radius:4px}
+.x:hover{color:var(--bad)}
+.steps{margin:12px 0 0;padding-left:20px;color:var(--muted);font-size:13px}
+.steps li{margin-bottom:4px}
+.run{width:100%;margin-top:16px;padding:14px;border:0;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-size:17px;font-weight:700;letter-spacing:.08em;cursor:pointer}
+.run:disabled{opacity:.45;cursor:not-allowed}
+.run:not(:disabled):hover{filter:brightness(1.08)}
+button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ghost{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 12px;border-radius:7px;cursor:pointer;font-size:13px}
+.ghost:hover{border-color:var(--accent)}
+.status{margin-top:10px;font-size:13px;color:var(--muted);min-height:1.4em}
+.status.err{color:var(--bad)}
+.resbar{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;justify-content:space-between}
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;flex:1 1 560px;min-width:0}
+@media (max-width:700px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{border-left:3px solid var(--line);padding:2px 0 2px 10px}
+.kpi .l{font-size:12px;color:var(--muted);letter-spacing:.04em}
+.kpi .v{font-family:var(--f-mono);font-size:20px;font-weight:500;font-variant-numeric:tabular-nums}
+.kpi.ok{border-color:var(--ok)} .kpi.bad{border-color:var(--bad)} .kpi.flag{border-color:#d4b200}
+.dl{display:flex;flex-direction:column;gap:8px;min-width:0}
+.dlbtn{display:flex;align-items:center;gap:8px;justify-content:center;padding:11px 18px;border-radius:8px;border:2px solid var(--accent);background:var(--accent);color:var(--accent-ink);font-weight:700;cursor:pointer;font-size:15px}
+.dlbtn.alt{background:var(--surface);color:var(--accent)}
+.dlbtn:hover{filter:brightness(1.07)}
+.dlbtn:disabled{opacity:.4;cursor:not-allowed}
+.badge{display:inline-block;font-size:11px;padding:1px 8px;border-radius:99px;background:var(--flag);color:var(--flag-ink);font-weight:700;letter-spacing:.06em;vertical-align:middle;margin-left:8px}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-top:18px;border-bottom:1px solid var(--line)}
+.tab{border:0;background:none;padding:8px 12px;cursor:pointer;color:var(--muted);font-size:13px;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--accent);border-color:var(--accent);font-weight:700}
+.tab .n{font-family:var(--f-mono);font-size:11px;margin-left:4px;opacity:.75}
+.tablewrap{overflow-x:auto;margin-top:12px;border:1px solid var(--line);border-radius:8px;max-height:560px;overflow-y:auto}
+table{border-collapse:collapse;font-size:12.5px;width:max-content;min-width:100%}
+th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;max-width:380px;overflow:hidden;text-overflow:ellipsis}
+th{position:sticky;top:0;background:var(--accent-soft);font-weight:700;z-index:1}
+td.num{font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+td.hl{background:var(--flag);color:var(--flag-ink)}
+tr:hover td{background:var(--accent-soft)} tr:hover td.hl{background:var(--flag)}
+.pill{font-size:11px;padding:1px 7px;border-radius:99px;font-weight:700}
+.pill.a{background:var(--ok-soft);color:var(--ok)} .pill.r{background:var(--bad-soft);color:var(--bad)}
+.note{font-size:12px;color:var(--muted);margin-top:8px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:10px}
+.sw{display:inline-block;width:12px;height:12px;border-radius:2px;background:var(--flag);vertical-align:-2px;margin-right:5px;border:1px solid var(--line)}
+.empty{padding:30px;text-align:center;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<style>html{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+
+<header class="mast"><div class="wrap">
+  <div>
+    <div class="tag">DIODES · MONTHLY POS · REBATE CLAIM</div>
+    <h1>達爾資料庫處理網站</h1>
+  </div>
+  <small>所有檔案只在你的瀏覽器內處理，不會上傳到任何伺服器</small>
+</div></header>
+
+<main class="wrap">
+  <section class="panel grid" aria-label="上傳與執行">
+    <div style="min-width:0">
+      <h2>1 · 上傳檔案</h2>
+      <p class="sub">可一次拖入多個 Excel（.xlsx / .xls / .csv），系統會依欄位自動判斷檔案類型，可再手動調整。</p>
+      <div id="drop" class="drop" tabindex="0" role="button" aria-label="選擇或拖曳檔案">
+        <b>拖曳檔案到這裡，或點擊選擇</b>
+        <span>CLAIM_RESPOND（必要）· Debit Report · ALLTEK POP FOR REBATE</span>
+      </div>
+      <input id="file" type="file" multiple accept=".xlsx,.xls,.xlsm,.csv" hidden>
+      <ul id="files" class="files"></ul>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button id="sampleBtn" class="ghost" type="button">載入範例資料</button>
+        <button id="clearBtn" class="ghost" type="button">清除全部</button>
+      </div>
+    </div>
+    <div style="min-width:0">
+      <h2>2 · 執行 Skill</h2>
+      <p class="sub">diodes-monthly-pos：重新申請 Rebate 流程</p>
+      <ol class="steps">
+        <li>依 ShipMonth 拆分至各月 Claim 分頁</li>
+        <li>統計 Accepted / Rejected 的 Rebate Amount</li>
+        <li>Rejected Comments 關鍵字分類（6 類）</li>
+        <li>修正 End Customer、Debit#、Invoice / DN</li>
+        <li>Part Number × Delivery No 樞紐，回填 POP 當月欄位，GAP 負數標黃底</li>
+        <li>產生 CSV（每個 Ship to × End Customer 一檔）</li>
+      </ol>
+      <button id="runBtn" class="run" type="button" disabled>▶ 執行處理</button>
+      <div id="status" class="status" role="status"></div>
+    </div>
+  </section>
+
+  <section id="results" class="panel" aria-label="處理結果" hidden>
+    <div class="resbar">
+      <div style="min-width:0;flex:1 1 560px">
+        <h2>3 · 處理結果 <span id="sampleBadge" class="badge" hidden>範例資料</span></h2>
+        <p id="resMeta" class="sub"></p>
+        <div class="kpis" id="kpis" style="margin-top:12px"></div>
+      </div>
+      <div class="dl">
+        <button id="dlXlsx" class="dlbtn" type="button">⬇ 下載 Excel 結果</button>
+        <button id="dlCsv" class="dlbtn alt" type="button">⬇ 下載 CSV 檔（ZIP）</button>
+        <div id="dlStatus" class="note" role="status"></div>
+      </div>
+    </div>
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <div class="legend"><span><i class="sw"></i>黃底 ＝ 已修正的欄位，或 GAP 為負數</span><span id="rowNote"></span></div>
+    <div class="tablewrap" id="tableWrap"></div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function(){
+"use strict";
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const N = s => String(s ?? "").toLowerCase().replace(/[\s_\-\/\(\)\.#:'’]/g, "");
+const K = s => String(s ?? "").trim().toUpperCase().replace(/\s+/g, " ");
+const num = v => { if (typeof v === "number") return v; const n = parseFloat(String(v ?? "").replace(/[,$\s]/g, "")); return isNaN(n) ? 0 : n; };
+const pad = n => String(n).padStart(2, "0");
+function toDate(v){
+  if (v instanceof Date) return isNaN(v) ? null : v;
+  if (typeof v === "number" && v > 20000 && v < 80000) return new Date(Math.round((v - 25569) * 864e5));
+  const s = String(v ?? "").trim(); if (!s) return null;
+  let m = s.match(/^(\d{4})(\d{2})(\d{2})$/); if (m) return new Date(+m[1], m[2]-1, +m[3]);
+  m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/); if (m) return new Date(+m[1], m[2]-1, +m[3]);
+  m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/); if (m) return new Date(+m[3], m[1]-1, +m[2]);
+  const d = new Date(s); return isNaN(d) ? null : d;
+}
+const fmtD = d => d ? `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}` : "";
+const ymd = d => `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+const addMonths = (d, m) => { const x = new Date(d); x.setMonth(x.getMonth() + m); return x; };
+const MON = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+const monLabel = ym => { const s = String(ym); return s.length >= 6 ? `${MON[+s.slice(4,6)-1]}'${s.slice(2,4)}` : s; };
+const money = n => n.toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2});
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- schemas ---------- */
+const SCHEMA = {
+  claim: { shipMonth:["shipmonth"], status:["approvalstatus"], comment:["rejectedcomments","rejectedcomment","rejectcomments","rejectcomment"],
+    rebate:["rebateamount"], pn:["partnumber"], shipTo:["shiptocustomername","shiptocustomer"], endCust:["endcustomername","endcustomer"],
+    debitNo:["shipdebitclaimnumber","shipdebitnumber","debitclaimnumber"], invoice:["diodesinvoicenumberheader","diodesinvoicenumber","diodesinvoice"],
+    price:["distipurchaseprice"], shipDate:["shipdate"], invDate:["invoicedate"], qty:["claimquantity","shipquantity","quantity","qty","claimqty","shipqty"],
+    resale:["distiresale"], distiCost:["disticost"], debitCost:["debitcost"] },
+  debit: { debitNo:["debit","debitno","debitnumber"], mpn:["debitmpn"], cust:["debitcustomer"], endCust:["debitendcustomer"],
+    expire:["debititemexpiredate","itemexpiredate","expiredate"], cost:["debitcost"], created:["createddate"], qty:["debitqty","debitquantity","quantity","qty"] },
+  pop: { pd:["p+d"], pn:["partno","partnumber"], price:["unitprice"], dn:["deliveryno","deliverynumber"], invDate:["invoicedate"],
+    shipDate:["shipdate"], qty:["qty","quantity"], gap:["gap"] }
+};
+const KEYF = { claim:["status","comment","rebate","shipMonth"], debit:["mpn","cust","expire","debitNo"], pop:["dn","price","gap","pd"] };
+const ROLE_LABEL = { claim:"CLAIM_RESPOND", debit:"Debit Report", pop:"POP FOR REBATE", skip:"不使用" };
+
+function mapCols(headers, schema){
+  const H = headers.map(N), out = {}, used = new Set();
+  for (const [f, al] of Object.entries(schema)){
+    let idx = -1;
+    for (const a of al){ const i = H.findIndex((h, j) => h === a && !used.has(j)); if (i >= 0){ idx = i; break; } }
+    if (idx < 0) for (const a of al){ if (a.length < 8) continue; const i = H.findIndex((h, j) => h.includes(a) && !used.has(j)); if (i >= 0){ idx = i; break; } }
+    if (idx >= 0){ out[f] = idx; used.add(idx); }
+  }
+  return out;
+}
+function analyze(name, wb){
+  let best = null;
+  for (const sn of wb.SheetNames){
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, raw:true, defval:""});
+    for (let r = 0; r < Math.min(30, aoa.length); r++){
+      const hdr = aoa[r].map(v => String(v ?? "").trim());
+      if (hdr.filter(Boolean).length < 3) continue;
+      for (const role of Object.keys(SCHEMA)){
+        const cols = mapCols(hdr, SCHEMA[role]);
+        const score = KEYF[role].filter(f => f in cols).length * 3 + Object.keys(cols).length;
+        if (!best || score > best.score) best = {score, role, sheet:sn, headerRow:r, headers:hdr, aoa};
+      }
+    }
+  }
+  if (!best) return {name, role:"skip", headers:[], rows:[]};
+  const rows = best.aoa.slice(best.headerRow + 1).filter(r => r.some(v => String(v ?? "").trim() !== ""));
+  return {name, role: best.score >= 6 ? best.role : "skip", sheet:best.sheet, headers:best.headers, rows};
+}
+
+/* ---------- reject classification ---------- */
+const ERR = [
+  {code:"END", label:"End customer 不符", test:c => /end\s*customer\s*does\s*not\s*match/i.test(c)},
+  {code:"INV1", label:"Invoice 總數量不足", test:c => /invoice\s*qty\s*\/?\s*amount\s*is\s*not\s*enough/i.test(c)},
+  {code:"EXP", label:"Debit# 已逾期", test:c => /extend\s*the\s*debit\s*expire|apply\s*new\s*debit/i.test(c)},
+  {code:"CUST", label:"Ship to Customer 不符", test:c => /customer\s*does\s*not\s*match/i.test(c)},
+  {code:"INV2", label:"Invoice 號碼錯誤", test:c => /confirm\s*the\s*diodes\s*invoice/i.test(c)},
+  {code:"DBC", label:"DBC / DC 與 Debit 不同", test:c => /confirm\s*the\s*dbc/i.test(c)},
+];
+const classify = c => ERR.find(e => e.test(c || "")) || (c ? {code:"OTHER", label:"其他（需人工確認）"} : null);
+
+/* ---------- main processing ---------- */
+function processAll(files){
+  const today = new Date(), todayS = ymd(today);
+  const claimFiles = files.filter(f => f.role === "claim");
+  if (!claimFiles.length) throw new Error("找不到 CLAIM_RESPOND 檔案。請確認檔案內有 Approval Status、Rejected Comments、Rebate Amount 等欄位，或在檔案旁的選單手動指定。");
+  const debitF = files.filter(f => f.role === "debit"), popF = files.filter(f => f.role === "pop");
+
+  // Claim records (all claim files share the first file's header layout)
+  const cH = claimFiles[0].headers, cc = mapCols(cH, SCHEMA.claim);
+  const miss = ["status","pn","qty"].filter(f => !(f in cc));
+  if (miss.length) throw new Error("CLAIM 檔缺少必要欄位：" + miss.map(f => ({status:"Approval Status",pn:"Part Number",qty:"Quantity"}[f])).join("、"));
+  const g = (row, f) => (f in cc) ? row[cc[f]] : "";
+  const recs = [];
+  for (const cf of claimFiles){
+    const m = mapCols(cf.headers, SCHEMA.claim);
+    for (const r of cf.rows){
+      const row = cH.map(h => { const j = cf.headers.indexOf(h); return j >= 0 ? r[j] : ""; });
+      const shipDate = toDate(g(row, "shipDate"));
+      let sm = g(row, "shipMonth");
+      if (sm instanceof Date) sm = `${sm.getFullYear()}${pad(sm.getMonth()+1)}`;
+      sm = String(sm || (shipDate ? `${shipDate.getFullYear()}${pad(shipDate.getMonth()+1)}` : "未知")).replace(/\D/g, "").slice(0,6) || "未知";
+      recs.push({ row, hl:new Set(), month:sm, status:K(g(row,"status")), comment:String(g(row,"comment") || ""),
+        rebate:num(g(row,"rebate")), pn:String(g(row,"pn")).trim(), shipTo:String(g(row,"shipTo")).trim(), endCust:String(g(row,"endCust")).trim(),
+        debitNo:String(g(row,"debitNo")).trim(), invoice:String(g(row,"invoice")).trim(), price:num(g(row,"price")), shipDate,
+        invDate:toDate(g(row,"invDate")), qty:num(g(row,"qty")), resale:g(row,"resale"), distiCost:g(row,"distiCost"), debitCost:num(g(row,"debitCost")),
+        err:null, action:"", note:"", fixed:false, newEnd:"", newDebit:"", newInv:"" });
+    }
+  }
+
+  // Debit rows
+  const debits = [];
+  for (const f of debitF){ const m = mapCols(f.headers, SCHEMA.debit);
+    for (const r of f.rows){ const v = k => (k in m) ? r[m[k]] : "";
+      debits.push({ debitNo:String(v("debitNo")).trim(), mpn:K(v("mpn")), cust:K(v("cust")), endCust:String(v("endCust")).trim(), endK:K(v("endCust")),
+        expire:toDate(v("expire")), cost:num(v("cost")), created:toDate(v("created")), qty:num(v("qty")) }); } }
+
+  // POP rows
+  let popH = [], popM = {}, pops = [];
+  if (popF.length){ popH = popF[0].headers; popM = mapCols(popH, SCHEMA.pop);
+    for (const f of popF){ const m = mapCols(f.headers, SCHEMA.pop);
+      for (const r of f.rows){ const v = k => (k in m) ? r[m[k]] : "";
+        const row = popH.map(h => { const j = f.headers.indexOf(h); return j >= 0 ? r[j] : ""; });
+        const gap = ("gap" in m) ? num(v("gap")) : num(v("qty"));
+        pops.push({ row, pn:K(v("pn")), price:num(v("price")), dn:String(v("dn")).trim(), shipDate:toDate(v("shipDate")), gap, left:gap,
+          pd: String(v("pd") || (K(v("pn")) + String(v("dn")).trim())).trim() }); } } }
+
+  const setCell = (rec, f, val) => { if (f in cc){ rec.row[cc[f]] = val; rec.hl.add(cc[f]); } };
+  const csvNeeds = [];
+
+  for (const rec of recs){
+    if (!/REJECT/.test(rec.status)) continue;
+    rec.err = classify(rec.comment); if (!rec.err) continue;
+    const code = rec.err.code;
+    if (code === "END"){
+      if (!debits.length){ rec.note = "未上傳 Debit Report，無法比對"; continue; }
+      const d = debits.find(x => x.debitNo === rec.debitNo && x.mpn === K(rec.pn));
+      if (d && d.endCust){ rec.newEnd = d.endCust; rec.action = "End Customer 依 Debit 覆蓋"; rec.note = `${rec.endCust} → ${d.endCust}`;
+        rec.endCust = d.endCust; setCell(rec, "endCust", d.endCust); rec.fixed = true; }
+      else rec.note = "Debit Report 中找不到相同 Debit# + MPN";
+    } else if (code === "CUST" || code === "EXP"){
+      if (!debits.length){ rec.note = "未上傳 Debit Report，無法比對"; continue; }
+      const c = debits.filter(x => x.mpn === K(rec.pn) && x.cust === K(rec.shipTo) && x.expire && rec.shipDate && rec.shipDate <= x.expire)
+        .sort((a, b) => a.cost - b.cost);
+      if (c.length){ const d = c[0]; rec.newDebit = d.debitNo; rec.action = "改用 Debit Cost 最低的有效 Debit#";
+        rec.note = `${rec.debitNo || "(空)"} → ${d.debitNo}（Debit Cost ${d.cost}，到期 ${fmtD(d.expire)}）`;
+        rec.debitNo = d.debitNo; setCell(rec, "debitNo", d.debitNo); rec.fixed = true; }
+      else { rec.action = "無符合 Debit，列入 CSV"; rec.note = "需申請新 Debit"; csvNeeds.push(rec); }
+    } else if (code === "INV1" || code === "INV2"){
+      if (!pops.length){ rec.note = "未上傳 ALLTEK POP FOR REBATE，無法比對"; continue; }
+      const ref = rec.invDate || rec.shipDate, lim = ref ? addMonths(ref, -34) : null;
+      const okDate = p => p.shipDate && ref && p.shipDate < ref && p.shipDate >= lim;
+      const elig = pops.filter(p => p.pn === K(rec.pn) && Math.abs(p.price - rec.price) < 1e-6 && okDate(p) && p.left > 0)
+        .sort((a, b) => a.shipDate - b.shipDate);
+      const one = elig.find(p => p.left >= rec.qty);
+      if (one){ one.left -= rec.qty; rec.newInv = one.dn; rec.action = "依 POP 配對 Delivery No";
+        rec.note = `${rec.invoice || "(空)"} → ${one.dn}（SHIP DATE ${fmtD(one.shipDate)}，剩餘 GAP ${one.left}）`;
+        rec.invoice = one.dn; setCell(rec, "invoice", one.dn); rec.fixed = true; }
+      else {
+        let need = rec.qty; const used = [];
+        for (const p of elig){ if (need <= 0) break; const take = Math.min(p.left, need); p.left -= take; need -= take; used.push(`${p.dn}×${take}`); }
+        const alt = pops.filter(p => p.pn === K(rec.pn) && Math.abs(p.price - rec.price) >= 1e-6 && okDate(p) && p.left >= Math.max(need, 1))
+          .sort((a, b) => a.shipDate - b.shipDate).slice(0, 3).map(p => `${p.dn}@${p.price}`);
+        if (used.length){ const first = used[0].split("×")[0]; rec.newInv = first; rec.invoice = first; setCell(rec, "invoice", first); rec.fixed = true; }
+        rec.action = used.length ? "GAP 不足，分配多筆 DN" : "無可用 DN";
+        rec.note = (used.length ? `分配：${used.join("、")}；` : "") + (need > 0 ? `不足 ${need}；已無可用DN` : "已足額")
+          + (need > 0 && alt.length ? `；其他 Unit Price 可替換：${alt.join("、")}` : "");
+      }
+    } else if (code === "DBC"){ rec.action = "需人工確認"; rec.note = "Skill 未定義 DBC/DC 的自動修正規則"; }
+    else { rec.action = "需人工確認"; }
+  }
+
+  /* ----- output sheets ----- */
+  const extraH = ["錯誤類型","修正動作","修正後 End Customer","修正後 Debit#","修正後 Invoice/DN","備註"];
+  const detailRow = r => [...r.row.map(v => v instanceof Date ? fmtD(v) : v), r.err ? r.err.label : "", r.action, r.newEnd, r.newDebit, r.newInv, r.note];
+  const mkSheet = (name, list) => ({ name, aoa:[[...cH, ...extraH], ...list.map(detailRow)],
+    hl: list.flatMap((r, i) => [...r.hl].map(c => [i + 1, c])) });
+
+  const sheets = [];
+  const months = [...new Set(recs.map(r => r.month))].sort();
+  const sum = (l, s) => l.filter(r => s ? s(r) : true).reduce((a, r) => a + r.rebate, 0);
+  const isA = r => /ACCEPT/.test(r.status), isR = r => /REJECT/.test(r.status);
+
+  // Summary
+  const sumAoa = [["Ship Month","Accepted 筆數","Accepted Rebate Amount","Rejected 筆數","Rejected Rebate Amount","合計 Rebate Amount"]];
+  for (const m of months){ const l = recs.filter(r => r.month === m);
+    sumAoa.push([m, l.filter(isA).length, +sum(l, isA).toFixed(2), l.filter(isR).length, +sum(l, isR).toFixed(2), +sum(l).toFixed(2)]); }
+  sumAoa.push(["合計", recs.filter(isA).length, +sum(recs, isA).toFixed(2), recs.filter(isR).length, +sum(recs, isR).toFixed(2), +sum(recs).toFixed(2)]);
+  sumAoa.push([], ["Reject 錯誤類型","筆數","已自動修正","Rebate Amount"]);
+  for (const e of [...ERR, {code:"OTHER", label:"其他（需人工確認）"}]){
+    const l = recs.filter(r => r.err && r.err.code === e.code); if (!l.length) continue;
+    sumAoa.push([e.label, l.length, l.filter(r => r.fixed).length, +sum(l).toFixed(2)]); }
+  sheets.push({name:"金額彙總", aoa:sumAoa, hl:[]});
+
+  // Reject 整理
+  const rej = recs.filter(isR);
+  sheets.push({name:"Reject整理", aoa:[["Ship Month","Part Number","Ship to Customer Name","End Customer Name","Ship/Debit Claim Number","Diodes Invoice Number","Quantity","Rebate Amount","Rejected Comments","錯誤類型","修正動作","備註"],
+    ...rej.map(r => [r.month, r.pn, r.shipTo, r.endCust, r.debitNo, r.invoice, r.qty, r.rebate, r.comment, r.err ? r.err.label : "", r.action, r.note])],
+    hl: rej.flatMap((r, i) => r.fixed ? [[i + 1, 10]] : [])});
+
+  sheets.push(mkSheet("處理後明細", recs));
+  for (const m of months) sheets.push(mkSheet(`ALLTEK-TW_${todayS}_CLAIM_${m}`.slice(0, 31), recs.filter(r => r.month === m)));
+
+  // Pivot P+D
+  const piv = new Map();
+  for (const r of recs){ if (!(isA(r) || r.fixed) || !r.invoice) continue;
+    const k = `${r.month}|${K(r.pn)}|${r.invoice}`; const o = piv.get(k) || {month:r.month, pn:r.pn, dn:r.invoice, qty:0}; o.qty += r.qty; piv.set(k, o); }
+  const pivRows = [...piv.values()].sort((a, b) => (a.month + a.pn + a.dn).localeCompare(b.month + b.pn + b.dn));
+  const pivAoa = [["月份欄位","Part Number","Delivery No","P+D","數量加總","POP GAP","扣除後 GAP"]], pivHl = [];
+  const popByPD = new Map(pops.map(p => [K(p.pd), p]));
+  pivRows.forEach((o, i) => { const pd = K(o.pn) + o.dn; const p = popByPD.get(K(pd)) || pops.find(x => x.pn === K(o.pn) && x.dn === o.dn);
+    const after = p ? p.gap - o.qty : "";
+    pivAoa.push([monLabel(o.month), o.pn, o.dn, pd, o.qty, p ? p.gap : "（POP 無此 P+D）", after]);
+    if (typeof after === "number" && after < 0) pivHl.push([i + 1, 6]); });
+  sheets.push({name:"PD樞紐", aoa:pivAoa, hl:pivHl});
+
+  // POP updated
+  if (pops.length){
+    const mLabels = months.filter(m => m !== "未知").map(monLabel);
+    const hdr = [...popH]; const mCol = {};
+    for (const l of mLabels){ let j = hdr.findIndex(h => N(h) === N(l)); if (j < 0){ hdr.push(l); j = hdr.length - 1; } mCol[l] = j; }
+    hdr.push("新 GAP"); const gCol = hdr.length - 1; const hl = [];
+    const aoa = [hdr, ...pops.map((p, i) => { const row = hdr.map((_, j) => p.row[j] instanceof Date ? fmtD(p.row[j]) : (p.row[j] ?? ""));
+      let used = 0;
+      for (const l of mLabels){ const q = pivRows.filter(o => monLabel(o.month) === l && K(o.pn) === p.pn && o.dn === p.dn).reduce((a, o) => a + o.qty, 0);
+        if (q){ row[mCol[l]] = q; used += q; hl.push([i + 1, mCol[l]]); } }
+      row[gCol] = p.gap - used; if (p.gap - used < 0) hl.push([i + 1, gCol]); return row; })];
+    sheets.push({name:"POP更新", aoa, hl});
+  }
+
+  // CSV
+  const yearAgo = addMonths(today, -12);
+  const csvHdr = ["Type","Part Number","Customer","Quantity","Start Date","Target","Internal Comments","End Customer"];
+  const groups = new Map();
+  for (const r of csvNeeds){
+    const match = debits.filter(d => d.mpn === K(r.pn) && d.cust === K(r.shipTo) && d.endK === K(r.endCust));
+    const recent = match.filter(d => d.created && d.created >= yearAgo);
+    const qty = recent.length ? Math.max(...recent.map(d => d.qty)) : "";
+    const resale = r.resale !== "" ? r.resale : (recs.find(x => K(x.pn) === K(r.pn) && K(x.shipTo) === K(r.shipTo) && x.resale !== "") || {}).resale || "";
+    const sameCost = match.filter(d => r.debitCost && Math.abs(d.cost - r.debitCost) < 1e-9).sort((a, b) => (b.created || 0) - (a.created || 0));
+    const A = sameCost[0] ? sameCost[0].debitNo : (r.debitNo || "");
+    const row = [100, r.pn, r.shipTo, qty, fmtD(today), resale, `${A} debit cost is ${r.distiCost}`, r.endCust];
+    const key = `${r.shipTo}｜${r.endCust}`; if (!groups.has(key)) groups.set(key, []);
+    if (!groups.get(key).some(x => x[1] === row[1])) groups.get(key).push(row);
+  }
+  const csvs = [...groups.entries()].map(([k, rows]) => { const [s, e] = k.split("｜");
+    const safe = t => String(t || "NA").replace(/[\\\/:*?"<>|]+/g, "_").replace(/\s+/g, "_").slice(0, 40);
+    return {name:`${safe(s)}__${safe(e)}_${todayS}.csv`, aoa:[csvHdr, ...rows]}; });
+  sheets.push({name:"CSV", aoa:[[...csvHdr, "檔名"], ...csvs.flatMap(c => c.aoa.slice(1).map(r => [...r, c.name]))], hl:[]});
+
+  const kpi = { total:recs.length, acc:sum(recs, isA), rej:sum(recs, isR), fixed:recs.filter(r => r.fixed).length, csv:csvNeeds.length,
+    files:files.filter(f => f.role !== "skip").map(f => `${ROLE_LABEL[f.role]}：${f.name}`), months, warn:[] };
+  if (!debitF.length) kpi.warn.push("未上傳 Debit Report");
+  if (!popF.length) kpi.warn.push("未上傳 POP FOR REBATE");
+  return {sheets, csvs, kpi, todayS};
+}
+
+/* ---------- state & UI ---------- */
+let files = [], result = null, isSample = false, activeTab = 0;
+const statusEl = $("status");
+const setStatus = (t, err) => { statusEl.textContent = t; statusEl.className = "status" + (err ? " err" : ""); };
+
+function renderFiles(){
+  const ul = $("files"); ul.innerHTML = "";
+  files.forEach((f, i) => {
+    const li = document.createElement("li");
+    li.innerHTML = `<div style="min-width:0"><div class="fn" title="${esc(f.name)}">${esc(f.name)}</div><div class="meta">${f.rows.length} 筆 · ${esc(f.sheet || "-")}</div></div>
+      <select id="role-${i}" aria-label="檔案類型">${Object.entries(ROLE_LABEL).map(([k, v]) => `<option value="${k}"${k === f.role ? " selected" : ""}>${v}</option>`).join("")}</select>
+      <button class="x" type="button" aria-label="移除 ${esc(f.name)}">×</button>`;
+    li.querySelector("select").onchange = e => { f.role = e.target.value; refreshRun(); };
+    li.querySelector(".x").onclick = () => { files.splice(i, 1); renderFiles(); };
+    ul.appendChild(li);
+  });
+  refreshRun();
+}
+function refreshRun(){ $("runBtn").disabled = !files.some(f => f.role === "claim"); }
+
+async function addFiles(list){
+  for (const file of list){
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:"array", cellDates:true});
+      files.push(analyze(file.name, wb));
+    }catch(e){ setStatus(`無法讀取「${file.name}」：請確認是 Excel 或 CSV 檔。`, true); }
+  }
+  if (isSample){ isSample = false; }
+  renderFiles(); setStatus(files.length ? `已載入 ${files.length} 個檔案，按「執行處理」開始。` : "");
+}
+
+const drop = $("drop"), input = $("file");
+drop.onclick = () => input.click();
+drop.onkeydown = e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); input.click(); } };
+input.onchange = () => { if (files.some(f => f.sample)) files = []; addFiles([...input.files]); input.value = ""; };
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => { if (files.some(f => f.sample)) files = []; addFiles([...e.dataTransfer.files]); });
+$("clearBtn").onclick = () => { files = []; result = null; renderFiles(); $("results").hidden = true; setStatus(""); };
+
+$("runBtn").onclick = () => {
+  setStatus("處理中…");
+  setTimeout(() => {
+    try{
+      result = processAll(files);
+      isSample = files.some(f => f.sample);
+      activeTab = 0; renderResults();
+      setStatus(`完成：${result.kpi.total} 筆明細，產生 ${result.sheets.length} 個分頁、${result.csvs.length} 個 CSV。` + (result.kpi.warn.length ? `（${result.kpi.warn.join("、")}，相關修正已略過）` : ""));
+    }catch(e){ console.error(e); setStatus(e.message || String(e), true); }
+  }, 30);
+};
+
+function renderResults(){
+  const r = result, k = r.kpi;
+  $("results").hidden = false; $("sampleBadge").hidden = !isSample;
+  $("resMeta").textContent = `Ship Month：${k.months.join("、")} ｜ ${k.files.join(" ｜ ")}`;
+  $("kpis").innerHTML = [
+    ["明細筆數", k.total, ""], ["Accepted 金額", money(k.acc), "ok"], ["Rejected 金額", money(k.rej), "bad"],
+    ["已自動修正", k.fixed, "flag"], ["需新增 Debit", k.csv, ""]
+  ].map(([l, v, c]) => `<div class="kpi ${c}"><div class="l">${l}</div><div class="v">${v}</div></div>`).join("");
+  $("dlCsv").disabled = !r.csvs.length;
+  $("dlCsv").textContent = r.csvs.length ? `⬇ 下載 CSV 檔（${r.csvs.length} 個，ZIP）` : "無需產生 CSV";
+  $("dlStatus").textContent = "";
+  const tabs = $("tabs"); tabs.innerHTML = "";
+  r.sheets.forEach((s, i) => {
+    const b = document.createElement("button"); b.className = "tab"; b.type = "button"; b.setAttribute("role", "tab");
+    b.setAttribute("aria-selected", i === activeTab); b.innerHTML = `${esc(s.name)}<span class="n">${Math.max(0, s.aoa.length - 1)}</span>`;
+    b.onclick = () => { activeTab = i; renderResults(); }; tabs.appendChild(b);
+  });
+  renderTable(r.sheets[activeTab]);
+}
+function renderTable(s){
+  const LIMIT = 300, hl = new Set(s.hl.map(([a, b]) => a + ":" + b));
+  const rows = s.aoa.slice(1, LIMIT + 1);
+  if (!rows.length){ $("tableWrap").innerHTML = `<div class="empty">此分頁沒有資料</div>`; $("rowNote").textContent = ""; return; }
+  const head = s.aoa[0], stCol = head.findIndex(h => N(h) === "approvalstatus");
+  let h = "<table><thead><tr>" + head.map(x => `<th>${esc(x)}</th>`).join("") + "</tr></thead><tbody>";
+  rows.forEach((row, i) => {
+    h += "<tr>" + head.map((_, j) => { let v = row[j] ?? ""; const isNum = typeof v === "number";
+      let inner = esc(isNum ? (Number.isInteger(v) ? v.toLocaleString("en-US") : v.toLocaleString("en-US", {maximumFractionDigits:6})) : v);
+      if (j === stCol && v) inner = `<span class="pill ${/REJECT/i.test(v) ? "r" : "a"}">${esc(v)}</span>`;
+      return `<td class="${isNum ? "num" : ""}${hl.has((i + 1) + ":" + j) ? " hl" : ""}" title="${esc(v)}">${inner}</td>`; }).join("") + "</tr>";
+  });
+  $("tableWrap").innerHTML = h + "</tbody></table>";
+  $("rowNote").textContent = s.aoa.length - 1 > LIMIT ? `預覽前 ${LIMIT} 筆，完整資料請下載 Excel` : "";
+}
+
+/* ---------- downloads ---------- */
+let dlCap = null;
+const dlReady = (async () => { try{ if (window.claude && window.claude.use) dlCap = await window.claude.use("downloads"); }catch(e){} })();
+async function saveFile(filename, data){
+  await Promise.race([dlReady, new Promise(r => setTimeout(r, 1500))]);
+  if (dlCap){
+    try{ await dlCap.save({filename, data}); return "已下載"; }
+    catch(e){ if (e && e.code === "declined") return "已取消下載"; if (e && e.code === "rate_limited") return "下載視窗已開啟，請先完成或關閉它"; }
+  }
+  const blob = data instanceof Blob ? data : new Blob([data]);
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  return "已下載";
+}
+function buildXlsx(){
+  const wb = XLSX.utils.book_new(), used = new Set();
+  for (const s of result.sheets){
+    const ws = XLSX.utils.aoa_to_sheet(s.aoa);
+    s.aoa[0].forEach((_, c) => { const a = XLSX.utils.encode_cell({r:0, c}); if (ws[a]) ws[a].s = {font:{bold:true}, fill:{fgColor:{rgb:"DCE3F2"}}}; });
+    for (const [r, c] of s.hl){ const a = XLSX.utils.encode_cell({r, c}); if (!ws[a]) ws[a] = {t:"s", v:""}; ws[a].s = {fill:{patternType:"solid", fgColor:{rgb:"FFFF00"}}}; }
+    ws["!cols"] = s.aoa[0].map((h, c) => ({wch: Math.min(40, Math.max(8, String(h).length + 2, ...s.aoa.slice(1, 50).map(r => String(r[c] ?? "").length + 1)))}));
+    let n = s.name.replace(/[\\\/?*\[\]:]/g, "_").slice(0, 31), i = 2; while (used.has(n)) n = s.name.slice(0, 28) + "_" + i++; used.add(n);
+    XLSX.utils.book_append_sheet(wb, ws, n);
+  }
+  return XLSX.write(wb, {bookType:"xlsx", type:"array"});
+}
+const toCsv = aoa => "﻿" + aoa.map(r => r.map(v => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }).join(",")).join("\r\n");
+$("dlXlsx").onclick = async () => { if (!result) return; $("dlStatus").textContent = "準備檔案中…";
+  try{ $("dlStatus").textContent = await saveFile(`DIODES_POS_處理結果_${result.todayS}.xlsx`, new Blob([buildXlsx()])); }
+  catch(e){ $("dlStatus").textContent = "下載失敗：" + (e.message || e); } };
+$("dlCsv").onclick = async () => { if (!result || !result.csvs.length) return; $("dlStatus").textContent = "壓縮 CSV 中…";
+  try{ const zip = new JSZip(); result.csvs.forEach(c => zip.file(c.name, toCsv(c.aoa)));
+    const blob = await zip.generateAsync({type:"blob"});
+    $("dlStatus").textContent = await saveFile(`DIODES_CSV_${result.todayS}.zip`, blob); }
+  catch(e){ $("dlStatus").textContent = "下載失敗：" + (e.message || e); } };
+
+/* ---------- sample data (clearly marked as 範例) ---------- */
+function sampleFiles(){
+  const d = (y, m, dd) => new Date(y, m - 1, dd);
+  const claim = [["Ship Month","Approval Status","Rejected Comments","Ship/Debit Claim Number","Part Number","Ship to Customer Name","End Customer Name","Ship Date","Quantity","Disti Purchase Price","DistiResale","DistiCost","Debit Cost","Rebate Amount","Diodes Invoice Number (Header)"],
+    [202603,"Accepted","","D2401001","AP2301-7","範例客戶A","範例終端A",d(2026,3,5),3000,0.052,0.08,0.045,0.045,21,"6100120001"],
+    [202603,"Accepted","","D2401004","BAT54C-7-F","範例客戶B","範例終端B",d(2026,3,9),6000,0.012,0.02,0.009,0.009,18,"6100120002"],
+    [202603,"Rejected","End customer does not match the one in Debit","D2401002","74LVC1G08SE","範例客戶B","終端B",d(2026,3,11),2000,0.031,0.05,0.026,0.026,10,"6100120003"],
+    [202603,"Rejected","Customer does not match the one in Debit.","D2401003","DMN3404L-7","範例客戶C","範例終端C",d(2026,3,14),4000,0.041,0.07,0.035,0.035,24,"6100120004"],
+    [202603,"Rejected","Please extend the debit expire date","D2309001","BAT54C-7-F","範例客戶A","範例終端A",d(2026,3,18),5000,0.012,0.02,0.010,0.010,10,"6100120005"],
+    [202603,"Rejected","pls apply new debit#","D2310002","ZXMS6004FF","範例客戶D","範例終端D",d(2026,3,20),1500,0.18,0.26,0.15,0.15,45,"6100120006"],
+    [202603,"Rejected","Diodes invoice QTY/Amount is not enough for this claim.","D2401001","AP2301-7","範例客戶A","範例終端A",d(2026,3,22),5000,0.052,0.08,0.045,0.045,35,"6100119999"],
+    [202603,"Rejected","pls confirm the Diodes invoice#.","D2401002","74LVC1G08SE","範例客戶B","範例終端B",d(2026,3,25),9000,0.031,0.05,0.026,0.026,45,"61001X"],
+    [202603,"Rejected","pls confirm the DBC & DC.","D2401004","BAT54C-7-F","範例客戶B","範例終端B",d(2026,3,27),2000,0.012,0.02,0.009,0.009,6,"6100120002"],
+    [202604,"Accepted","","D2401003","DMN3404L-7","範例客戶C","範例終端C",d(2026,4,2),3500,0.041,0.07,0.035,0.035,21,"6100120010"],
+    [202604,"Rejected","pls apply new debit#","D2310002","ZXMS6004FF","範例客戶D","範例終端E",d(2026,4,6),800,0.18,0.26,0.15,0.15,24,"6100120011"]];
+  const debit = [["Debit #","Debit MPN","Debit Customer","Debit End Customer","Debit Distributor Book Cost","Debit Cost","Debit Qty","Created Date","Debit_Item_Expire_Date"],
+    ["D2401002","74LVC1G08SE","範例客戶B","範例終端B",0.031,0.026,20000,d(2026,1,8),d(2026,12,31)],
+    ["D2402005","DMN3404L-7","範例客戶C","範例終端C",0.041,0.034,30000,d(2026,2,3),d(2026,12,31)],
+    ["D2403006","DMN3404L-7","範例客戶C","範例終端C",0.041,0.036,10000,d(2026,3,1),d(2026,12,31)],
+    ["D2309001","BAT54C-7-F","範例客戶A","範例終端A",0.012,0.010,40000,d(2025,9,1),d(2026,2,28)],
+    ["D2405007","BAT54C-7-F","範例客戶A","範例終端A",0.012,0.0095,50000,d(2026,2,20),d(2027,2,28)],
+    ["D2310002","ZXMS6004FF","範例客戶D","範例終端D",0.18,0.15,12000,d(2025,10,5),d(2026,1,31)],
+    ["D2311003","ZXMS6004FF","範例客戶D","範例終端D",0.18,0.15,18000,d(2025,12,15),d(2026,2,28)]];
+  const pop = [["P+D","Part No","Unit Price","Delivery No","SHIP DATE","Invoice Date","Qty","GAP"],
+    ["AP2301-76100110001","AP2301-7",0.052,"6100110001",d(2023,4,10),d(2023,4,10),10000,1200],
+    ["AP2301-76100110002","AP2301-7",0.052,"6100110002",d(2024,6,3),d(2024,6,3),12000,8000],
+    ["AP2301-76100120001","AP2301-7",0.052,"6100120001",d(2025,11,20),d(2025,11,20),15000,4000],
+    ["74LVC1G08SE6100110010","74LVC1G08SE",0.031,"6100110010",d(2024,2,14),d(2024,2,14),10000,5000],
+    ["74LVC1G08SE6100110011","74LVC1G08SE",0.031,"6100110011",d(2025,5,2),d(2025,5,2),8000,2500],
+    ["74LVC1G08SE6100110012","74LVC1G08SE",0.029,"6100110012",d(2025,8,9),d(2025,8,9),9000,6000],
+    ["BAT54C-7-F6100120002","BAT54C-7-F",0.012,"6100120002",d(2025,12,1),d(2025,12,1),20000,5000],
+    ["DMN3404L-76100120010","DMN3404L-7",0.041,"6100120010",d(2026,1,15),d(2026,1,15),10000,3000]];
+  const mk = (name, aoa) => { const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "Sheet1");
+    const f = analyze(name, XLSX.read(XLSX.write(wb, {bookType:"xlsx", type:"array"}), {type:"array", cellDates:true})); f.sample = true; return f; };
+  return [mk("範例_CLAIM_RESPOND_ALLTEK TW.xlsx", claim), mk("範例_Debit Report.xlsx", debit), mk("範例_ALLTEK POP FOR REBATE.xlsx", pop)];
+}
+$("sampleBtn").onclick = () => { files = sampleFiles(); renderFiles(); $("runBtn").click(); };
+
+if (window.XLSX){ files = sampleFiles(); renderFiles(); $("runBtn").click(); }
+else setStatus("Excel 處理元件載入失敗，請重新整理頁面。", true);
+})();
+</script>
+
+</body>
+</html>
