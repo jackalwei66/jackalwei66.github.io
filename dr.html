@@ -1,0 +1,893 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>達爾資料庫處理網站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: masthead → upload + run panel → result bar (KPIs + download) → tabbed sheet preview */
+:root{
+  --bg:#f2f4f7; --surface:#ffffff; --ink:#1d2433; --muted:#5b6476; --line:#d9dee7;
+  --accent:#2a3f7a; --accent-ink:#ffffff; --accent-soft:#e6eaf5;
+  --flag:#fff2a8; --flag-ink:#5a4a00; --fix:#fde3cf; --fix-ink:#6b3510;
+  --ok:#1f7a4d; --ok-soft:#e2f3ea; --bad:#b4372f; --bad-soft:#fbe7e5;
+  --f-display:"Noto Serif TC","Songti TC",serif; --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121620; --surface:#1a2030; --ink:#e7eaf1; --muted:#9aa3b6; --line:#2c3446;
+  --accent:#8fa6ea; --accent-ink:#10162a; --accent-soft:#232c45;
+  --flag:#4d4410; --flag-ink:#fff2a8; --fix:#4a2e17; --fix-ink:#ffd9bb;
+  --ok:#6fd3a0; --ok-soft:#173527; --bad:#f08a80; --bad-soft:#3d1f1d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121620; --surface:#1a2030; --ink:#e7eaf1; --muted:#9aa3b6; --line:#2c3446;
+  --accent:#8fa6ea; --accent-ink:#10162a; --accent-soft:#232c45;
+  --flag:#4d4410; --flag-ink:#fff2a8; --fix:#4a2e17; --fix-ink:#ffd9bb;
+  --ok:#6fd3a0; --ok-soft:#173527; --bad:#f08a80; --bad-soft:#3d1f1d; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:0 48px}
+header.mast{border-bottom:3px solid var(--accent);background:var(--surface)}
+header.mast .wrap{padding-block:22px 18px;display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 24px}
+h1{font-family:var(--f-display);font-weight:900;font-size:clamp(26px,4vw,36px);margin:0;letter-spacing:.04em;text-wrap:balance}
+.mast small{color:var(--muted);font-size:13px}
+.mast .tag{font-family:var(--f-mono);font-size:12px;color:var(--muted);letter-spacing:.06em}
+h2{font-size:17px;margin:0 0 4px;font-weight:700}
+.sub{color:var(--muted);font-size:13px;margin:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px;margin-top:22px}
+.grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:20px}
+@media (max-width:820px){.grid{grid-template-columns:minmax(0,1fr)}}
+.drop{margin-top:14px;border:2px dashed var(--line);border-radius:10px;padding:26px 16px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.over,.drop:focus-visible{border-color:var(--accent);background:var(--accent-soft);outline:none}
+.drop b{display:block;font-size:16px}
+.drop span{color:var(--muted);font-size:13px}
+.files{list-style:none;padding:0;margin:14px 0 0;display:flex;flex-direction:column;gap:8px}
+.files li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px}
+.files .fn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.files .meta{color:var(--muted);font-size:12px;font-family:var(--f-mono);overflow-wrap:anywhere}
+.files .meta.err{color:var(--bad)}
+select,button{font:inherit}
+select{padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font-size:13px}
+.x{border:0;background:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:2px 6px;border-radius:4px}
+.x:hover{color:var(--bad)}
+.steps{margin:12px 0 0;padding-left:20px;color:var(--muted);font-size:13px}
+.steps li{margin-bottom:4px}
+.run{width:100%;margin-top:16px;padding:14px;border:0;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-size:17px;font-weight:700;letter-spacing:.08em;cursor:pointer}
+.run:disabled{opacity:.45;cursor:not-allowed}
+.run:not(:disabled):hover{filter:brightness(1.08)}
+button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ghost{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 12px;border-radius:7px;cursor:pointer;font-size:13px}
+.ghost:hover{border-color:var(--accent)}
+.status{margin-top:10px;font-size:13px;color:var(--muted);min-height:1.4em}
+.status.err{color:var(--bad)}
+.resbar{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;justify-content:space-between}
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;flex:1 1 560px;min-width:0}
+@media (max-width:760px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{border-left:3px solid var(--line);padding:2px 0 2px 10px;min-width:0}
+.kpi .l{font-size:12px;color:var(--muted);letter-spacing:.04em}
+.kpi .v{font-family:var(--f-mono);font-size:20px;font-weight:500;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.kpi.ok{border-color:var(--ok)} .kpi.bad{border-color:var(--bad)} .kpi.flag{border-color:#d4b200} .kpi.fixk{border-color:#d9822b}
+.dl{display:flex;flex-direction:column;gap:8px;min-width:0}
+.dlbtn{display:flex;align-items:center;gap:8px;justify-content:center;padding:11px 18px;border-radius:8px;border:2px solid var(--accent);background:var(--accent);color:var(--accent-ink);font-weight:700;cursor:pointer;font-size:15px}
+.dlbtn.alt{background:var(--surface);color:var(--accent)}
+.dlbtn:hover{filter:brightness(1.07)}
+.dlbtn:disabled{opacity:.4;cursor:not-allowed}
+.badge{display:inline-block;font-size:11px;padding:1px 8px;border-radius:99px;background:var(--flag);color:var(--flag-ink);font-weight:700;letter-spacing:.06em;vertical-align:middle;margin-left:8px}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-top:18px;border-bottom:1px solid var(--line)}
+.tab{border:0;background:none;padding:8px 12px;cursor:pointer;color:var(--muted);font-size:13px;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--accent);border-color:var(--accent);font-weight:700}
+.tab .n{font-family:var(--f-mono);font-size:11px;margin-left:4px;opacity:.75}
+.tablewrap{overflow-x:auto;margin-top:12px;border:1px solid var(--line);border-radius:8px;max-height:560px;overflow-y:auto}
+table{border-collapse:collapse;font-size:12.5px;width:max-content;min-width:100%}
+th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;max-width:420px;overflow:hidden;text-overflow:ellipsis}
+th{position:sticky;top:0;background:var(--accent-soft);font-weight:700;z-index:1}
+th.sop{background:var(--bad-soft);color:var(--bad)}
+td.num{font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+td.fx{background:var(--fix);color:var(--fix-ink)}
+td.hl{background:var(--flag);color:var(--flag-ink)}
+tr:hover td{background:var(--accent-soft)} tr:hover td.hl{background:var(--flag)} tr:hover td.fx{background:var(--fix)}
+.pill{font-size:11px;padding:1px 7px;border-radius:99px;font-weight:700}
+.pill.a{background:var(--ok-soft);color:var(--ok)} .pill.r{background:var(--bad-soft);color:var(--bad)} .pill.na{background:var(--accent-soft);color:var(--muted)}
+.note{font-size:12px;color:var(--muted);margin-top:8px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:10px}
+.sw{display:inline-block;width:12px;height:12px;border-radius:2px;background:var(--flag);vertical-align:-2px;margin-right:5px;border:1px solid var(--line)}
+.sw.fx{background:var(--fix)}
+.empty{padding:30px;text-align:center;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+</head>
+<body>
+<header class="mast"><div class="wrap">
+  <div>
+    <div class="tag">DIODES · MONTHLY POS · REBATE CLAIM</div>
+    <h1>達爾資料庫處理網站</h1>
+  </div>
+  <small>所有檔案只在你的瀏覽器內處理，不會上傳到任何伺服器</small>
+</div></header>
+
+<main class="wrap">
+  <section class="panel grid" aria-label="上傳與執行">
+    <div style="min-width:0">
+      <h2>1 · 上傳檔案</h2>
+      <p class="sub">可一次拖入多個 Excel（.xlsx / .xlsm / .xls / .csv），系統會依欄位自動判斷每個分頁的用途，可再手動調整。</p>
+      <div id="drop" class="drop" tabindex="0" role="button" aria-label="選擇或拖曳檔案">
+        <b>拖曳檔案到這裡，或點擊選擇</b>
+        <span>CLAIM_RESPOND（含 Excel Template 與 RESPOND 分頁，必要）· Debit Report · ALLTEK POP FOR REBATE</span>
+      </div>
+      <input id="file" type="file" multiple accept=".xlsx,.xls,.xlsm,.csv" hidden>
+      <ul id="files" class="files"></ul>
+      <p class="note">POP 檔約 50MB，讀取約需 30–90 秒，只會讀「扣數(New)」分頁。</p>
+      <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+        <button id="sampleBtn" class="ghost" type="button">載入範例資料</button>
+        <button id="clearBtn" class="ghost" type="button">清除全部</button>
+      </div>
+    </div>
+    <div style="min-width:0">
+      <h2>2 · 執行 Skill</h2>
+      <p class="sub">diodes-monthly-pos-for-sop：重新申請 Rebate 流程</p>
+      <ol class="steps">
+        <li>RESPOND 新增 AM~AQ，Pos Invoice 剖析至 AR~AS</li>
+        <li>依 Ship_Month 建立當月分頁（如 202603）</li>
+        <li>Excel Template 新增 BH~BL，依 Invoice Date 月份比對當月分頁</li>
+        <li>依 BI 統計 Accepted / Rejected 的 Rebate Amount（AX）</li>
+        <li>BK 關鍵字分 7 類並修正：換 Debit#、改 End Customer、備註 open QTY、POP 配 DN 並拆分明細</li>
+        <li>Part Number & Delivery No 樞紐，代入 POP 當月欄位，GAP 負數標黃底</li>
+        <li>產生 CSV（每個 Ship to × End Customer 一檔）</li>
+      </ol>
+      <button id="runBtn" class="run" type="button" disabled>▶ 執行處理</button>
+      <div id="status" class="status" role="status"></div>
+    </div>
+  </section>
+
+  <section id="results" class="panel" aria-label="處理結果" hidden>
+    <div class="resbar">
+      <div style="min-width:0;flex:1 1 560px">
+        <h2>3 · 處理結果 <span id="sampleBadge" class="badge" hidden>範例資料</span></h2>
+        <p id="resMeta" class="sub"></p>
+        <div class="kpis" id="kpis" style="margin-top:12px"></div>
+      </div>
+      <div class="dl">
+        <button id="dlXlsx" class="dlbtn" type="button">⬇ 下載 Excel 結果</button>
+        <button id="dlCsv" class="dlbtn alt" type="button">⬇ 下載 CSV 檔（ZIP）</button>
+        <div id="dlStatus" class="note" role="status"></div>
+      </div>
+    </div>
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <div class="legend"><span><i class="sw fx"></i>橘底 ＝ 已修正的欄位</span><span><i class="sw"></i>黃底 ＝ GAP 為負數</span><span id="rowNote"></span></div>
+    <div class="tablewrap" id="tableWrap"></div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+/* ---------- workbook reading (also runs inside a Web Worker) ---------- */
+/* Recompute a sheet's range from cells that hold data; formatting alone can stretch !ref to column XFD. */
+function fixRef(ws){
+  var maxR = -1, maxC = -1;
+  for (var k in ws){ if (k[0] === "!") continue; var c = ws[k]; if (!c || c.v === undefined || c.v === null || c.v === "") continue;
+    var a = XLSX.utils.decode_cell(k); if (a.r > maxR) maxR = a.r; if (a.c > maxC) maxC = a.c; }
+  if (maxR >= 0) ws["!ref"] = XLSX.utils.encode_range({s:{r:0, c:0}, e:{r:maxR, c:maxC}});
+}
+/* Large POP files hold 100+ sheets; only the 扣數 sheet is needed. */
+function parseBook(buf){
+  var names = XLSX.read(buf, {type:"array", bookSheets:true}).SheetNames, want = names;
+  if (buf.byteLength > 15e6){ var m = names.filter(function(n){ return /扣數/.test(n); }); if (m.length) want = m; }
+  var wb = XLSX.read(buf, {type:"array", cellDates:true, sheets:want, cellFormula:false, cellHTML:false, cellText:false, cellStyles:false});
+  var out = [];
+  want.forEach(function(sn){ var ws = wb.Sheets[sn]; if (!ws) return; fixRef(ws);
+    out.push({sheet:sn, aoa:XLSX.utils.sheet_to_json(ws, {header:1, raw:true, blankrows:false})}); });
+  return out;
+}
+</script>
+<script>
+(function(){
+"use strict";
+const LIB = "https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js";
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const N = s => String(s ?? "").toLowerCase().replace(/[\s_\-\/\(\)\.#:'’]/g, "");
+const K = s => String(s ?? "").trim().toUpperCase().replace(/\s+/g, " ");
+const S = v => (v === null || v === undefined) ? "" : (typeof v === "number" && Number.isInteger(v) ? String(v) : String(v).trim());
+const num = v => { if (typeof v === "number") return v; const n = parseFloat(String(v ?? "").replace(/[,$\s]/g, "")); return isNaN(n) ? 0 : n; };
+const pad = n => String(n).padStart(2, "0");
+function toDate(v){
+  if (v instanceof Date) return isNaN(v) ? null : v;
+  if (typeof v === "number" && v > 20000 && v < 80000) return new Date(Math.round((v - 25569) * 864e5));
+  const s = String(v ?? "").trim(); if (!s) return null;
+  let m = s.match(/^(\d{4})(\d{2})(\d{2})$/); if (m) return new Date(+m[1], m[2]-1, +m[3]);
+  m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/); if (m) return new Date(+m[1], m[2]-1, +m[3]);
+  m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/); if (m) return new Date(+m[3], m[1]-1, +m[2]);
+  const d = new Date(s); return isNaN(d) ? null : d;
+}
+/* Dates read from Excel can land a few minutes before local midnight; shift by 12h before taking the calendar day. */
+const day = d => d ? new Date(d.getTime() + 12 * 36e5) : null;
+const fmtD = d => { d = day(d); return d ? `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}` : ""; };
+const ymd = d => `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+const ymOf = d => { d = day(d); return d ? `${d.getFullYear()}${pad(d.getMonth()+1)}` : ""; };
+const addMonths = (d, m) => { const x = new Date(d); x.setMonth(x.getMonth() + m); return x; };
+const MON = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+const monLabel = ym => { const s = String(ym); return s.length >= 6 ? `${MON[+s.slice(4,6)-1]}'${s.slice(2,4)}` : s; };
+function headerMonth(h){
+  if (h instanceof Date) return ymOf(h);
+  const m = String(h ?? "").trim().toUpperCase().match(/^([A-Z]{3})'?(\d{2})$/);
+  if (m && MON.includes(m[1])) return `20${m[2]}${pad(MON.indexOf(m[1]) + 1)}`;
+  return "";
+}
+const money = n => n.toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2});
+const intf = n => Math.round(n).toLocaleString("en-US");
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const COL = c => XLSX.utils.encode_col(c);
+const near = (a, b) => Math.abs(a - b) < 1e-7;
+const mode = arr => { const m = new Map(); arr.forEach(v => m.set(v, (m.get(v) || 0) + 1)); return [...m.entries()].sort((a, b) => b[1] - a[1])[0][0]; };
+
+/* ---------- table schemas ---------- */
+const SCHEMA = {
+  template:{ f:{ invDate:["invoicedate"], invNo:["invoicenumber"], item:["invoiceitemnumber"], pn:["partnumber"], qty:["quantity"],
+      price:["distipurchaseprice"], cost:["disticost"], resale:["distiresale"], ext:["resaleextension"], debitNo:["shipdebitclaimnumber"],
+      inv:["diodesinvoicenumberheader","diodesinvoicenumber"], shipTo:["shiptocustomername"], endCust:["endcustomername"], rebate:["rebateamount"] },
+    key:["item","pn","price","cost","invDate","shipTo"] },
+  respond:{ f:{ status:["status"], msg:["rejectedmessage"], cmt:["comments"], code:["rejectcode"], mpn:["mpn"], posInv:["posinvoice"],
+      shipMonth:["shipmonth"], total:["totalclaim"], pnno:["pn&no"] }, key:["status","posInv","shipMonth","mpn","cmt"] },
+  debit:{ f:{ status:["itemstatus"], debitNo:["debit","debitno","debitnumber"], created:["createddate"], start:["debitstartdate"],
+      cust:["debitcustomer"], endCust:["debitendcustomer"], mpn:["debitmpn"], auth:["authorizedqty"], shipped:["quantityshipped"],
+      expire:["debititemexpiredate"], cost:["debitcost"], dbc:["debitdistributorbookcost"] }, key:["mpn","expire","cost","debitNo","cust"] },
+  pop:{ f:{ pd:["p+d"], pn:["partno"], dn:["deliveryno"], shipDate:["shipdate"], price:["unitprice"], qty:["shipqty"], gap:["gap"] },
+    key:["pd","pn","dn","price","gap","shipDate"] }
+};
+const ROLE_LABEL = { template:"Excel Template", respond:"RESPOND", debit:"Debit Report", pop:"POP 扣數" };
+const FILE_ROLE = { auto:"自動判斷", claim:"CLAIM_RESPOND", debit:"Debit Report", pop:"POP FOR REBATE", skip:"不使用" };
+
+function mapCols(headers, schema){
+  const H = headers.map(h => h instanceof Date ? "" : N(h)), out = {}, used = new Set();
+  for (const [f, al] of Object.entries(schema)){
+    let idx = -1;
+    for (const a of al){ const i = H.findIndex((h, j) => h === a && !used.has(j)); if (i >= 0){ idx = i; break; } }
+    if (idx < 0) for (const a of al){ if (a.length < 8) continue; const i = H.findIndex((h, j) => h.includes(a) && !used.has(j)); if (i >= 0){ idx = i; break; } }
+    if (idx >= 0){ out[f] = idx; used.add(idx); }
+  }
+  return out;
+}
+/* Find each sheet's header row and decide which table it is. */
+function analyzeSheets(sheets){
+  const tables = [];
+  for (const {sheet, aoa} of sheets){
+    let best = null;
+    for (let r = 0; r < Math.min(30, aoa.length); r++){
+      const hdr = Array.from(aoa[r] || [], v => v ?? "");
+      if (hdr.filter(v => String(v).trim()).length < 3) continue;
+      for (const role of Object.keys(SCHEMA)){
+        const cols = mapCols(hdr, SCHEMA[role].f), hit = SCHEMA[role].key.filter(k => k in cols).length;
+        if (hit < 4) continue;
+        const score = hit * 3 + Object.keys(cols).length;
+        if (!best || score > best.score) best = {score, role, r, hdr, cols};
+      }
+    }
+    if (!best) continue;
+    let last = best.hdr.length - 1; while (last >= 0 && String(best.hdr[last] ?? "").trim() === "" && !(best.hdr[last] instanceof Date)) last--;
+    const W = Math.max(last + 1, ...Object.values(best.cols).map(c => c + 1));
+    const rows = aoa.slice(best.r + 1).filter(r => r && r.some(v => String(v ?? "").trim() !== "")).map(r => { const x = Array.from({length:W}, (_, j) => r[j] ?? ""); return x; });
+    tables.push({sheet, role:best.role, headers:best.hdr.slice(0, W), cols:best.cols, rows});
+  }
+  return tables;
+}
+
+/* ---------- file reading: Web Worker first, main thread as fallback ---------- */
+let worker = null, workerBroken = false, jobId = 0; const jobs = new Map();
+function getWorker(){
+  if (worker || workerBroken) return worker;
+  try{
+    const src = `importScripts(${JSON.stringify(LIB)});\n${fixRef.toString()}\n${parseBook.toString()}\n` +
+      `onmessage=function(e){try{postMessage({id:e.data.id,ok:true,r:parseBook(e.data.buf)})}catch(err){postMessage({id:e.data.id,ok:false,err:String(err&&err.message||err)})}}`;
+    worker = new Worker(URL.createObjectURL(new Blob([src], {type:"text/javascript"})));
+    worker.onmessage = e => { const j = jobs.get(e.data.id); if (!j) return; jobs.delete(e.data.id); e.data.ok ? j.res(e.data.r) : j.rej(new Error(e.data.err)); };
+    worker.onerror = e => { e.preventDefault(); workerBroken = true; worker = null; for (const j of jobs.values()) j.fallback(); jobs.clear(); };
+  }catch(e){ workerBroken = true; worker = null; }
+  return worker;
+}
+function readBook(buf){
+  return new Promise((res, rej) => {
+    const local = () => setTimeout(() => { try{ res(parseBook(buf)); }catch(e){ rej(e); } }, 30);
+    const w = getWorker(); if (!w) return local();
+    const id = ++jobId; jobs.set(id, {res, rej, fallback:local});
+    w.postMessage({id, buf:buf.slice(0)});
+  });
+}
+
+/* ---------- reject classification (SOP keyword list, BK first then BJ) ---------- */
+const CATS = [
+  {code:"B", label:"B. Ship to Customer 不符", kw:["customer / end customer does not match","customer does not match the one in debit"]},
+  {code:"E", label:"E. End customer 不符", kw:["pls apply new debit# with correct end customer name","end customer does not match the one in debit"]},
+  {code:"A", label:"A. Debit# 已逾期", kw:["please extend the debit expire date","extend debit# expire date","pls apply new debit#","pls confirm the debit# and mpn","pls confirm the debit#."]},
+  {code:"C", label:"C. DBC / DC 與 Debit 不同", kw:["pls confirm the dbc & dc","pls confirm the debit# and dc"]},
+  {code:"D", label:"D. Debit# 數量不足", kw:["pls extend the debit open qty","increase debit# open qty"]},
+  {code:"F", label:"F. Diodes Invoice 總數量不足", kw:["diodes invoice qty/amount is not enough"]},
+  {code:"G", label:"G. Diodes Invoice 號碼錯誤", kw:["pls confirm the diodes invoice#","dbc does not match to diodes invoice","invoice# is over 3 years","mpn does not match to diodes invoice"]},
+];
+const OTHER = {code:"H", label:"H. 其他（SOP 未定義）"};
+function classify(cmt, msg){
+  const a = String(cmt ?? "").toLowerCase(), b = String(msg ?? "").toLowerCase();
+  for (const t of [a, b]) for (const c of CATS) if (c.kw.some(k => t.includes(k))) return c;
+  return OTHER;
+}
+
+/* ---------- main processing ---------- */
+function processAll(tables){
+  const today = new Date(), todayS = ymd(today);
+  const T = tables.filter(t => t.role === "template"), R = tables.filter(t => t.role === "respond");
+  const D = tables.filter(t => t.role === "debit"), P = tables.filter(t => t.role === "pop");
+  if (!T.length) throw new Error("找不到 Claim 分頁「Excel Template」。請確認檔案內有 Invoice Date、Invoice Item Number、Part Number、Disti Purchase Price、DistiCost 等欄位。");
+  if (!R.length) throw new Error("找不到核准結果分頁「RESPOND」。請確認檔案內有 Status、Pos Invoice、Ship_Month、Mpn 等欄位。");
+  const warn = [];
+  if (!D.length) warn.push("未上傳 Debit Report，換 Debit#、End Customer 與 CSV 數量已略過");
+  if (!P.length) warn.push("未上傳 POP FOR REBATE，Delivery No 配對已略過");
+
+  /* Step 1–2: RESPOND → AM~AS, split into Ship_Month sheets */
+  const rsp = R[0], rc = rsp.cols;
+  const baseW = ("pnno" in rc) ? rc.pnno : rsp.headers.length;
+  const months = new Map();          // month -> {rows:[], first:Map(key -> rec)}
+  for (const row of rsp.rows){
+    const pos = S(row[rc.posInv]); const i = pos.lastIndexOf("_");
+    const inv = i >= 0 ? pos.slice(0, i) : pos, itemS = i >= 0 ? pos.slice(i + 1) : "";
+    const item = /^\d+$/.test(itemS) ? +itemS : itemS;
+    let sm = row[rc.shipMonth]; sm = sm instanceof Date ? ymOf(sm) : S(sm).replace(/\D/g, "").slice(0, 6);
+    if (!sm) sm = "未知";
+    const r = { base:row.slice(0, baseW), key:S(row[rc.mpn]) + S(item), inv, item, status:S(row[rc.status]),
+      msg:("msg" in rc) ? S(row[rc.msg]) : "", cmt:("cmt" in rc) ? S(row[rc.cmt]) : "", code:("code" in rc) ? S(row[rc.code]) : "" };
+    if (!months.has(sm)) months.set(sm, {rows:[], first:new Map()});
+    const M = months.get(sm); M.rows.push(r); if (!M.first.has(r.key)) M.first.set(r.key, r);
+  }
+
+  /* Step 3: Excel Template rows + BH~BL lookup */
+  const tpl = T[0], tc = tpl.cols;
+  const tW = tpl.headers.length;
+  const recs = [];
+  tpl.rows.forEach((row, idx) => {
+    const pn = S(row[tc.pn]);
+    if (!pn || /^(required|optional|conditional)/i.test(pn)) return;
+    const invDate = toDate(row[tc.invDate]), month = ymOf(invDate) || "未知";
+    const key = pn + S(row[tc.item]);
+    const hit = months.has(month) ? months.get(month).first.get(key) : null;
+    recs.push({ row:row.slice(), src:idx, fx:new Set(), month, key, invDate, pn,
+      qty:num(row[tc.qty]), price:num(row[tc.price]), cost:num(row[tc.cost]), resale:num(row[tc.resale]),
+      debitNo:S(row[tc.debitNo]), inv:S(row[tc.inv]), shipTo:S(row[tc.shipTo]), endCust:S(row[tc.endCust]),
+      BI:hit ? hit.status : null, BJ:hit ? hit.msg : "", BK:hit ? hit.cmt : "", BL:hit ? hit.code : "",
+      cat:null, fixType:"", oldVal:"", newVal:"", note:"", modified:false, csv:false, children:[] });
+  });
+  const setF = (rec, f, val) => { rec[f] = val; if (f in tc){ rec.row[tc[f]] = val; rec.fx.add(tc[f]); } };
+
+  /* Debit report (all debit sheets, de-duplicated by Debit# + MPN) */
+  const debits = [], seenD = new Set();
+  for (const t of D){ const c = t.cols, v = (r, k) => (k in c) ? r[c[k]] : "";
+    for (const r of t.rows){
+      const d = { debitNo:S(v(r,"debitNo")), mpn:K(v(r,"mpn")), cust:K(v(r,"cust")), endCust:S(v(r,"endCust")), endK:K(v(r,"endCust")),
+        status:S(v(r,"status")), created:toDate(v(r,"created")), start:toDate(v(r,"start")), expire:toDate(v(r,"expire")),
+        cost:num(v(r,"cost")), dbc:num(v(r,"dbc")), auth:num(v(r,"auth")), shipped:num(v(r,"shipped")) };
+      if (!d.debitNo || !d.mpn) continue;
+      d.remain = ("auth" in c) ? d.auth - d.shipped : Infinity;
+      const k = d.debitNo + "|" + d.mpn; if (seenD.has(k)) continue; seenD.add(k); debits.push(d);
+    } }
+  const debByMpn = new Map(); debits.forEach(d => { if (!debByMpn.has(d.mpn)) debByMpn.set(d.mpn, []); debByMpn.get(d.mpn).push(d); });
+
+  /* POP 扣數 */
+  const pops = [], popByPN = new Map(), popByPD = new Map(); let popH = [], popMonthCol = {};
+  if (P.length){
+    popH = P[0].headers;
+    popH.forEach((h, j) => { const m = headerMonth(h); if (m && !(m in popMonthCol)) popMonthCol[m] = j; });
+    for (const t of P){ const c = t.cols, v = (r, k) => (k in c) ? r[c[k]] : "";
+      for (const r of t.rows){
+        const pn = K(v(r,"pn")), dn = S(v(r,"dn")); if (!pn || !dn) continue;
+        const p = { row:r, pn, dn, price:num(v(r,"price")), shipDate:toDate(v(r,"shipDate")), qty:num(v(r,"qty")), gap:num(v(r,"gap")),
+          pd:S(v(r,"pd")) || (S(v(r,"pn")) + dn) };
+        p.left = p.gap; pops.push(p);
+        if (!popByPN.has(pn)) popByPN.set(pn, []); popByPN.get(pn).push(p);
+        const pk = K(p.pd); if (!popByPD.has(pk)) popByPD.set(pk, p);
+      } }
+    for (const l of popByPN.values()) l.sort((a, b) => (a.shipDate || 0) - (b.shipDate || 0));
+  }
+
+  /* Step 5: classify and fix */
+  const rejected = recs.filter(r => /REJECT/i.test(r.BI || ""));
+  for (const rec of rejected){
+    rec.cat = classify(rec.BK, rec.BJ);
+    const c = rec.cat.code;
+    if (c === "E"){
+      if (!debits.length){ rec.fixType = "無法修正"; rec.note = "未上傳 Debit Report"; continue; }
+      const m = (debByMpn.get(K(rec.pn)) || []).filter(d => d.debitNo === rec.debitNo).sort((a, b) => (b.created || 0) - (a.created || 0));
+      if (m.length && m[0].endCust){
+        rec.fixType = "修正 End Customer Name"; rec.oldVal = rec.endCust; rec.newVal = m[0].endCust;
+        rec.note = `依 Debit ${rec.debitNo} + ${rec.pn} 帶出 Debit End Customer 覆蓋原資料`;
+        setF(rec, "endCust", m[0].endCust); rec.modified = true;
+      } else { rec.fixType = "無法修正"; rec.note = "Debit Report 查無此 Debit# + MPN"; }
+    }
+    else if (c === "A" || c === "B" || c === "C"){
+      if (!debits.length){ rec.fixType = "無法修正"; rec.note = "未上傳 Debit Report"; continue; }
+      const sd = rec.invDate;
+      let m = (debByMpn.get(K(rec.pn)) || []).filter(d => d.cust === K(rec.shipTo) && sd && d.expire && day(sd) <= day(d.expire)
+        && (!d.start || day(d.start) <= day(sd)) && !/closed/i.test(d.status));
+      if (!m.length){ rec.fixType = "無符合 Debit → 列入 CSV"; rec.note = "Debit Report 無同 MPN + Customer 且 Ship date 在有效期內的 Debit，需申請新 Debit（見 CSV 分頁）"; rec.csv = true; continue; }
+      const me = m.filter(d => d.endK === K(rec.endCust)); if (me.length) m = me;
+      const ok = m.filter(d => d.remain >= rec.qty), pool = ok.length ? ok : m;
+      const p = pool.slice().sort((a, b) => a.cost - b.cost || (b.created || 0) - (a.created || 0))[0];
+      rec.oldVal = `${rec.debitNo || "(空)"} / DC ${rec.cost}`; rec.newVal = `${p.debitNo} / DC ${p.cost}`;
+      let note = `改用 ${p.debitNo}（DC ${p.cost}，DBC ${p.dbc}，Item 到期 ${fmtD(p.expire)}` + (isFinite(p.remain) ? `，剩餘 ${intf(p.remain)}` : "") + `）；共 ${m.length} 組符合，取 Debit cost 最低`;
+      if (p.debitNo === rec.debitNo) note += "；同 Debit#，僅更新 DC（Item 到期日已展延）";
+      if (!ok.length) note += `；注意：符合的 Debit 剩餘數量皆小於申請數量 ${intf(rec.qty)}`;
+      if (p.endK && p.endK !== K(rec.endCust)){ note += `；End Customer 同步改為 ${p.endCust}（原 ${rec.endCust}）`; setF(rec, "endCust", p.endCust); }
+      setF(rec, "debitNo", p.debitNo); setF(rec, "cost", p.cost);
+      rec.fixType = "更換 Debit#"; rec.note = note; rec.modified = true;
+    }
+    else if (c === "D"){
+      const m = (debByMpn.get(K(rec.pn)) || []).find(d => d.debitNo === rec.debitNo);
+      rec.fixType = "備註"; rec.note = "extend debit#數量" + (m && isFinite(m.remain) ? `；Debit Report 剩餘 ${intf(m.remain)} / 申請 ${intf(rec.qty)}` : "");
+    }
+    else if (c === "F" || c === "G"){
+      if (!pops.length){ rec.fixType = "無法修正"; rec.note = "未上傳 POP FOR REBATE"; continue; }
+      const inv = rec.invDate, lim = inv ? addMonths(inv, -34) : null, q = rec.qty, old = rec.inv;
+      const base = (popByPN.get(K(rec.pn)) || []).filter(p => p.shipDate && inv && p.shipDate < inv && p.shipDate > lim);
+      const same = base.filter(p => near(p.price, rec.price) && p.left > 0);
+      const full = same.find(p => p.left >= q);
+      if (full){
+        full.left -= q;
+        const skipped = same.filter(p => p.shipDate < full.shipDate);
+        rec.fixType = "更換 Delivery No"; rec.oldVal = old; rec.newVal = full.dn;
+        rec.note = `DN ${full.dn}（SHIP DATE ${fmtD(full.shipDate)}，UP ${rec.price}）GAP 足夠，扣後剩 ${intf(full.left)}` +
+          (skipped.length ? `；較舊 ${skipped.length} 筆 DN GAP 不足（合計 ${intf(skipped.reduce((a, p) => a + p.left, 0))}）` : "");
+        setF(rec, "inv", full.dn); rec.modified = true; continue;
+      }
+      const take = (list, need, parts) => { for (const p of list){ if (need <= 0) break; const u = Math.min(need, p.left); if (u <= 0) continue; p.left -= u; need -= u; parts.push({p, u}); } return need; };
+      const parts = [], notes = [];
+      let need = take(same, q, parts);
+      if (parts.length) notes.push("同 Unit Price 無單一 DN GAP 足夠；" + parts.map(x => `DN ${x.p.dn} 可用 ${intf(x.u)}`).join("、"));
+      if (need > 0){
+        notes.push(`同 Unit Price 的 DN 仍不足 ${intf(need)}，已無可用DN`);
+        const other = base.filter(p => !near(p.price, rec.price) && p.left > 0), n0 = parts.length;
+        need = take(other, need, parts);
+        if (parts.length > n0) notes.push("改用其他 Unit Price 的 DN：" + parts.slice(n0).map(x => `DN ${x.p.dn}（UP ${x.p.price}）${intf(x.u)}`).join("、"));
+        if (need > 0) notes.push(`其他 Unit Price 亦不足，仍缺 ${intf(need)}`);
+      }
+      if (!parts.length){ rec.fixType = "已無可用DN"; rec.oldVal = old; rec.note = notes.join("；") || "已無可用DN；同 Part No 其他 Unit Price 亦無可用 DN"; continue; }
+      const alloc = parts.map(x => ({dn:x.p.dn, price:x.p.price, qty:x.u}));
+      if (need > 0) alloc.push({dn:old, price:rec.price, qty:need, rest:true});
+      const n = alloc.length, origQty = q;
+      rec.fixType = "更換 Delivery No" + (n > 1 ? "（拆分明細）" : "") + (need > 0 ? "（仍有不足）" : "");
+      rec.oldVal = `${old} / UP ${rec.price} / Qty ${intf(origQty)}`;
+      alloc.forEach((a, s) => {
+        const tgt = s === 0 ? rec : { ...rec, row:rec.row.slice(), fx:new Set(rec.fx), children:[], split:s + 1 };
+        setF(tgt, "inv", /^\d+$/.test(a.dn) ? +a.dn : a.dn); tgt.inv = a.dn;
+        setF(tgt, "price", a.price); setF(tgt, "qty", a.qty); tgt.modified = true;
+        tgt.newVal = `${a.dn} / UP ${a.price} / Qty ${intf(a.qty)}`;
+        tgt.note = s === 0 ? notes.join("；") + (n > 1 ? `；拆分第 1/${n} 筆` : "") : `由原明細（Qty ${intf(origQty)}）拆出第 ${s + 1}/${n} 筆`;
+        if (a.rest) tgt.note += "；此筆為不足數量，保留原 Invoice / UP，已無可用DN";
+        if (s > 0) rec.children.push(tgt);
+      });
+    }
+    else {
+      rec.fixType = "未處理（SOP 未定義）";
+      const m = String(rec.BK).match(/debit#\s*(D\d+)/i); if (m) rec.note = `Diodes 建議改用 ${m[1]}（SOP 未定義，未修改）`;
+    }
+  }
+
+  /* flatten (split rows follow their source row) and recompute amounts */
+  const all = [];
+  for (const r of recs){ all.push(r); for (const c of r.children) all.push(c); }
+  for (const r of all){
+    r.rebate = r.qty * (r.price - r.cost);
+    if ("ext" in tc && r.split){ r.row[tc.ext] = r.qty * r.resale; r.fx.add(tc.ext); }
+    else if ("ext" in tc && r.children.length){ r.row[tc.ext] = r.qty * r.resale; r.fx.add(tc.ext); }
+    if (r.rebate < 0 && r.modified) r.note += "；注意：DistiCost 高於 Disti Purchase Price，Rebate Amount 為負，請確認";
+  }
+
+  /* ----- output sheets ----- */
+  const sheets = [];
+  const isA = r => /ACCEPT/i.test(r.BI || ""), isR = r => /REJECT/i.test(r.BI || ""), isNA = r => !r.BI;
+  const sum = (l, f) => l.filter(f || (() => true)).reduce((a, r) => a + r.rebate, 0);
+  const monthList = [...months.keys()].sort();
+  const tplMonths = [...new Set(all.map(r => r.month))].sort();
+
+  // 金額彙總
+  const sm = [["Approval Status (BI)","筆數","Rebate Amount (AX)"],
+    ["Accepted", all.filter(isA).length, +sum(all, isA).toFixed(4)],
+    ["Rejected", all.filter(isR).length, +sum(all, isR).toFixed(4)],
+    ["RESPOND 查無回覆", all.filter(isNA).length, +sum(all, isNA).toFixed(4)],
+    ["合計", all.length, +sum(all).toFixed(4)], [],
+    ["Invoice 月份","Accepted 筆數","Accepted Rebate Amount","Rejected 筆數","Rejected Rebate Amount","查無回覆 筆數"]];
+  for (const m of tplMonths){ const l = all.filter(r => r.month === m);
+    sm.push([m, l.filter(isA).length, +sum(l, isA).toFixed(4), l.filter(isR).length, +sum(l, isR).toFixed(4), l.filter(isNA).length]); }
+  sm.push([], ["Reject 錯誤類別","筆數","已修改","Rebate Amount"]);
+  for (const c of [...CATS.slice().sort((a, b) => a.code.localeCompare(b.code)), OTHER]){
+    const l = all.filter(r => r.cat && r.cat.code === c.code); if (!l.length) continue;
+    sm.push([c.label, l.length, l.filter(r => r.modified).length, +sum(l).toFixed(4)]); }
+  sm.push([], ["修正類別","筆數"]);
+  const ft = new Map(); all.filter(r => r.fixType).forEach(r => ft.set(r.fixType, (ft.get(r.fixType) || 0) + 1));
+  for (const [k, v] of ft) sm.push([k, v]);
+  sheets.push({name:"金額彙總", aoa:sm});
+
+  // Reject整理
+  const rejAll = all.filter(isR);
+  sheets.push({name:"Reject整理", aoa:[["Invoice 月份","Part Number","Ship to Customer Name","End Customer Name","Ship/Debit Claim Number","Diodes Invoice Number","Quantity","Rebate Amount","Rejected Comments (BK)","錯誤類別","修正類別","備註"],
+    ...rejAll.map(r => [r.month, r.pn, r.shipTo, r.endCust, r.debitNo, r.inv, r.qty, +r.rebate.toFixed(4), r.BK, r.cat ? r.cat.label : "", r.fixType, r.note])]});
+
+  // Excel Template（處理後）
+  const rebCol = ("rebate" in tc) ? tc.rebate : Math.max(tW, 49);
+  const bh = Math.max(59, tW, rebCol + 1), bm = bh + 5, W = bm + 5;
+  const th = Array.from({length:W}, (_, j) => j < tW ? tpl.headers[j] : "");
+  th[rebCol] = "Rebate Amount";
+  ["Part# & Tracking#","Approval Status","Rejected Message","Rejected Comments","Reject Code"].forEach((h, i) => th[bh + i] = h);
+  ["錯誤類別","修正類別","原資料","修正後","修正備註"].forEach((h, i) => th[bm + i] = h);
+  const L = f => COL(tc[f]), tf = new Map(), tfx = [];
+  const amCol = baseW, AM = COL(amCol), AQ = COL(amCol + 4);
+  const tAoa = [th, ...all.map((r, i) => {
+    const R1 = i + 2, row = Array.from({length:W}, (_, j) => j < tW ? r.row[j] : "");
+    row[rebCol] = +r.rebate.toFixed(6); tf.set(`${i+1}:${rebCol}`, `${L("qty")}${R1}*(${L("price")}${R1}-${L("cost")}${R1})`);
+    row[bh] = r.key; tf.set(`${i+1}:${bh}`, `${L("pn")}${R1}&${L("item")}${R1}`);
+    const have = months.has(r.month);
+    [r.BI, r.BJ, r.BK, r.BL].forEach((v, k) => {
+      row[bh + 1 + k] = r.BI === null ? "#N/A" : (v === "" ? 0 : v);
+      tf.set(`${i+1}:${bh+1+k}`, have ? `VLOOKUP(${COL(bh)}${R1},'${r.month}'!$${AM}:$${AQ},${k+2},0)` : "NA()");
+    });
+    row[bm] = r.cat ? r.cat.label : ""; row[bm+1] = r.fixType; row[bm+2] = r.oldVal; row[bm+3] = r.newVal; row[bm+4] = r.note;
+    for (const c of r.fx) tfx.push([i + 1, c]);
+    if (r.split) tfx.push([i + 1, tc.pn]);
+    return row; })];
+  sheets.push({name:"Excel Template", aoa:tAoa, fx:tfx, f:tf, sop:[rebCol, bh, bh+1, bh+2, bh+3, bh+4], red:[bh, bh+1, bh+2, bh+3, bh+4], statusCol:bh + 1});
+
+  // Ship_Month sheets (RESPOND rows + AM~AS)
+  for (const m of monthList){
+    const M = months.get(m), mf = new Map();
+    const hdr = [...rsp.headers.slice(0, baseW), "PN&NO","Status","Rejected Message","Comments","Reject Code","Pos Invoice",""];
+    const aoa = [hdr, ...M.rows.map((r, i) => { const R1 = i + 2;
+      const asL = COL(amCol + 6);
+      mf.set(`${i+1}:${amCol}`, `${COL(rc.mpn)}${R1}&${asL}${R1}`);
+      mf.set(`${i+1}:${amCol+1}`, `${COL(rc.status)}${R1}`);
+      if ("msg" in rc) mf.set(`${i+1}:${amCol+2}`, `${COL(rc.msg)}${R1}`);
+      if ("cmt" in rc) mf.set(`${i+1}:${amCol+3}`, `${COL(rc.cmt)}${R1}`);
+      if ("code" in rc) mf.set(`${i+1}:${amCol+4}`, `${COL(rc.code)}${R1}`);
+      return [...r.base, r.key, r.status, r.msg || 0, r.cmt || 0, r.code || 0, r.inv, r.item]; })];
+    sheets.push({name:String(m), aoa, f:mf, sop:[amCol, amCol+1, amCol+2, amCol+3, amCol+4, amCol+5, amCol+6], statusCol:rc.status});
+  }
+
+  // Step 6: PD 樞紐 + POP 更新
+  const piv = new Map();
+  for (const r of all){ if (!(isA(r) || r.modified) || !r.inv) continue;
+    const pd = S(r.pn) + S(r.inv), k = r.month + "|" + K(pd);
+    const o = piv.get(k) || {month:r.month, pd, qty:0, n:0}; o.qty += r.qty; o.n++; piv.set(k, o); }
+  const pivRows = [...piv.values()].sort((a, b) => (a.month + a.pd).localeCompare(b.month + b.pd));
+  const addByPD = new Map(); pivRows.forEach(o => { const p = popByPD.get(K(o.pd)); if (p) addByPD.set(p, (addByPD.get(p) || 0) + o.qty); });
+  const pivAoa = [["月份","列標籤 (Part Number & Delivery No)","加總 - Quantity","明細筆數","POP 狀態"]], pivNeg = [];
+  const upd = [["P+D","Part No","Delivery No","SHIP DATE","Unit Price","Ship Qty","代入月份欄","POP 原當月數值","加總 - Quantity","新當月數值","POP 原 GAP","新 GAP","備註"]], updNeg = [];
+  pivRows.forEach((o, i) => {
+    const p = popByPD.get(K(o.pd));
+    const mc = popMonthCol[o.month];
+    const label = monLabel(o.month) + (mc !== undefined ? `（${COL(mc)} 欄）` : "（POP 無此月份欄，請新增）");
+    if (!p){ pivAoa.push([monLabel(o.month), o.pd, o.qty, o.n, pops.length ? "POP 查無此 P+D（Diodes Invoice Number 非 DN）" : "未上傳 POP"]); return; }
+    const newGap = p.gap - addByPD.get(p);
+    pivAoa.push([monLabel(o.month), o.pd, o.qty, o.n, newGap < 0 ? "GAP 為負數" : "OK"]);
+    if (newGap < 0) pivNeg.push([pivAoa.length - 1, 4]);
+    const cur = mc !== undefined ? num(p.row[mc]) : 0;
+    upd.push([p.pd, S(p.row[P[0].cols.pn]), p.dn, p.shipDate ? fmtD(p.shipDate) : "", p.price, p.qty, label, cur, o.qty, cur + o.qty, p.gap, newGap, newGap < 0 ? "GAP 為負數" : ""]);
+    if (newGap < 0) for (let j = 0; j < 13; j++) updNeg.push([upd.length - 1, j]);
+  });
+  sheets.push({name:"PD樞紐", aoa:pivAoa, neg:pivNeg});
+  sheets.push({name:"POP更新", aoa:upd, neg:updNeg});
+
+  // Step 7: CSV
+  const yearAgo = addMonths(today, -12);
+  const groups = new Map();
+  for (const r of all.filter(r => r.csv)){ const k = [K(r.pn), K(r.shipTo), K(r.endCust)].join("|");
+    if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); }
+  const csvRows = [];
+  for (const g of groups.values()){
+    const r0 = g[0], match = (debByMpn.get(K(r0.pn)) || []).filter(d => d.cust === K(r0.shipTo) && d.endK === K(r0.endCust));
+    const notes = [];
+    const recent = match.filter(d => d.created && d.created >= yearAgo);
+    let qty; if (recent.length) qty = Math.max(...recent.map(d => d.auth));
+    else { qty = g.reduce((a, r) => a + r.qty, 0); notes.push("一年內無相同 PN / Customer / End Customer 的 Debit，Requested Quantity 以本次 Claim 數量合計代入"); }
+    const dc = mode(g.map(r => r.cost)), rs = mode(g.map(r => r.resale));
+    if (new Set(g.map(r => r.cost)).size > 1) notes.push("DistiCost 有多個值，取最常見值");
+    if (new Set(g.map(r => r.resale)).size > 1) notes.push("DistiResale 有多個值，取最常見值");
+    const byNew = l => l.slice().sort((a, b) => (b.created || 0) - (a.created || 0));
+    const same = byNew(match.filter(d => near(d.cost, dc)));
+    let A;
+    if (same.length) A = same[0].debitNo;
+    else if (match.length){ A = byNew(match)[0].debitNo; notes.push("Debit Report 無相同 Debit Cost 的 Debit，取同 PN / Customer / End Customer 最新的 Debit#"); }
+    else { A = mode(g.map(r => r.debitNo)); notes.push("Debit Report 無同 PN / Customer / End Customer 的 Debit，取 Claim 原 Debit#"); }
+    csvRows.push({ pn:r0.pn, shipTo:r0.shipTo, endCust:r0.endCust, qty, start:+todayS, target:rs, comment:`${A} debit cost is ${dc}.`, dc, lines:g.length, claimQty:g.reduce((a, r) => a + r.qty, 0), note:notes.join("；") });
+  }
+  csvRows.sort((a, b) => (a.shipTo + a.endCust + a.pn).localeCompare(b.shipTo + b.endCust + b.pn));
+  const csvHdr = ["","MPN","Customer PN","Requested Quantity ","Start Date","  Target  ","Internal Comments","End Customer"];
+  const safe = t => String(t || "NA").replace(/[^A-Za-z0-9一-鿿]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "NA";
+  const cg = new Map();
+  for (const x of csvRows){ const k = x.shipTo + "｜" + x.endCust; if (!cg.has(k)) cg.set(k, []); cg.get(k).push(x); }
+  const csvs = [...cg.entries()].map(([k, rows]) => { const [s, e] = k.split("｜");
+    const name = `rebate_cost_${safe(s)}` + (K(s) === K(e) ? "" : `__EC_${safe(e)}`) + `_${todayS}.csv`;
+    rows.forEach(r => r.file = name);
+    return {name, aoa:[csvHdr, ...rows.map(r => [100, r.pn, r.shipTo, r.qty, r.start, r.target, r.comment, r.endCust])]}; });
+  sheets.push({name:"CSV", aoa:[["PN","Customer","Resale price","Debit cost","End Customer","Requested Quantity","Start Date","Target","Internal Comments","本次 Claim 數量","Claim 筆數","檔名","備註"],
+    ...csvRows.map(r => [r.pn, r.shipTo, r.target, r.dc, r.endCust, r.qty, r.start, r.target, r.comment, r.claimQty, r.lines, r.file, r.note])]});
+
+  const kpi = { total:all.length, acc:sum(all, isA), rej:sum(all, isR), fixed:all.filter(r => r.modified).length,
+    split:all.filter(r => r.split).length, csv:csvRows.length, months:monthList, tplMonths, warn,
+    src:tables.map(t => `${ROLE_LABEL[t.role]}：${t.file}／${t.sheet}`) };
+  return {sheets, csvs, kpi, todayS};
+}
+
+/* ---------- state & UI ---------- */
+let files = [], result = null, isSample = false, activeTab = 0;
+const statusEl = $("status");
+const setStatus = (t, err) => { statusEl.textContent = t; statusEl.className = "status" + (err ? " err" : ""); };
+const fileRoleOf = t => t.role === "template" || t.role === "respond" ? "claim" : t.role;
+function activeTables(){
+  const out = [];
+  for (const f of files){ if (f.loading || f.error || f.role === "skip") continue;
+    for (const t of f.tables) if (f.role === "auto" || fileRoleOf(t) === f.role) out.push({...t, file:f.name}); }
+  // one Excel Template / RESPOND / POP table is used; every Debit sheet is merged
+  const pick = role => { const l = out.filter(t => t.role === role); return l.length ? [l.sort((a, b) => b.rows.length - a.rows.length)[0]] : []; };
+  return [...pick("template"), ...pick("respond"), ...out.filter(t => t.role === "debit"), ...pick("pop")];
+}
+function renderFiles(){
+  const ul = $("files"); ul.innerHTML = "";
+  files.forEach((f, i) => {
+    const li = document.createElement("li");
+    const meta = f.loading ? `讀取中…（${(f.size / 1048576).toFixed(1)} MB）` : f.error ? f.error
+      : f.tables.length ? f.tables.map(t => `${ROLE_LABEL[t.role]} ${t.rows.length.toLocaleString()} 筆`).join(" · ") : "找不到可用的分頁";
+    li.innerHTML = `<div style="min-width:0"><div class="fn" title="${esc(f.name)}">${esc(f.name)}</div><div class="meta${f.error ? " err" : ""}">${esc(meta)}</div></div>
+      <select id="role-${i}" aria-label="檔案類型"${f.loading ? " disabled" : ""}>${Object.entries(FILE_ROLE).map(([k, v]) => `<option value="${k}"${k === f.role ? " selected" : ""}>${v}</option>`).join("")}</select>
+      <button class="x" type="button" aria-label="移除 ${esc(f.name)}">×</button>`;
+    li.querySelector("select").onchange = e => { f.role = e.target.value; refreshRun(); };
+    li.querySelector(".x").onclick = () => { files.splice(files.indexOf(f), 1); renderFiles(); };
+    ul.appendChild(li);
+  });
+  refreshRun();
+}
+function refreshRun(){
+  const t = activeTables();
+  $("runBtn").disabled = files.some(f => f.loading) || !t.some(x => x.role === "template") || !t.some(x => x.role === "respond");
+}
+async function addFiles(list){
+  if (files.some(f => f.sample)){ files = []; isSample = false; }
+  const entries = [...list].map(file => ({name:file.name, size:file.size, role:"auto", tables:[], loading:true, file}));
+  files.push(...entries); renderFiles();
+  setStatus(entries.some(e => e.size > 15e6) ? "讀取大型檔案中，請稍候…" : "讀取中…");
+  await Promise.all(entries.map(async f => {
+    try{ const buf = await f.file.arrayBuffer(); const sheets = await readBook(buf); f.tables = analyzeSheets(sheets); }
+    catch(e){ console.error(e); f.error = `無法讀取：${e.message || e}`; }
+    f.loading = false; delete f.file; renderFiles();
+  }));
+  const t = activeTables();
+  setStatus(!t.some(x => x.role === "template") ? "還缺 CLAIM_RESPOND 的 Excel Template 分頁。" : !t.some(x => x.role === "respond") ? "還缺 RESPOND 分頁。" : `已載入 ${files.length} 個檔案，按「執行處理」開始。`);
+}
+
+const drop = $("drop"), input = $("file");
+drop.onclick = () => input.click();
+drop.onkeydown = e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); input.click(); } };
+input.onchange = () => { addFiles([...input.files]); input.value = ""; };
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => addFiles([...e.dataTransfer.files]));
+$("clearBtn").onclick = () => { files = []; result = null; renderFiles(); $("results").hidden = true; setStatus(""); };
+
+$("runBtn").onclick = () => {
+  setStatus("處理中…");
+  setTimeout(() => {
+    try{
+      result = processAll(activeTables());
+      isSample = files.some(f => f.sample);
+      activeTab = 0; renderResults(); prepareDownloads();
+      setStatus(`完成：${result.kpi.total.toLocaleString()} 筆明細，產生 ${result.sheets.length} 個分頁、${result.csvs.length} 個 CSV。` + (result.kpi.warn.length ? `（${result.kpi.warn.join("；")}）` : ""));
+    }catch(e){ console.error(e); setStatus(e.message || String(e), true); }
+  }, 30);
+};
+
+function renderResults(){
+  const r = result, k = r.kpi;
+  $("results").hidden = false; $("sampleBadge").hidden = !isSample;
+  $("resMeta").textContent = `Ship Month：${k.months.join("、")} ｜ Invoice 月份：${k.tplMonths.join("、")} ｜ ${k.src.join(" ｜ ")}`;
+  $("kpis").innerHTML = [
+    ["明細筆數", k.total.toLocaleString(), ""], ["Accepted 金額", money(k.acc), "ok"], ["Rejected 金額", money(k.rej), "bad"],
+    ["已修正明細", k.fixed.toLocaleString(), "fixk"], ["拆分新增", k.split.toLocaleString(), "flag"], ["需新增 Debit", k.csv.toLocaleString(), ""]
+  ].map(([l, v, c]) => `<div class="kpi ${c}"><div class="l">${l}</div><div class="v">${v}</div></div>`).join("");
+  const tabs = $("tabs"); tabs.innerHTML = "";
+  r.sheets.forEach((s, i) => {
+    const b = document.createElement("button"); b.className = "tab"; b.type = "button"; b.setAttribute("role", "tab");
+    b.setAttribute("aria-selected", i === activeTab); b.innerHTML = `${esc(s.name)}<span class="n">${Math.max(0, s.aoa.length - 1).toLocaleString()}</span>`;
+    b.onclick = () => { activeTab = i; renderResults(); }; tabs.appendChild(b);
+  });
+  renderTable(r.sheets[activeTab]);
+}
+function renderTable(s){
+  const LIMIT = 300, fx = new Set((s.fx || []).map(([a, b]) => a + ":" + b)), neg = new Set((s.neg || []).map(([a, b]) => a + ":" + b));
+  const sop = new Set(s.sop || []);
+  const rows = s.aoa.slice(1, LIMIT + 1);
+  if (!rows.length){ $("tableWrap").innerHTML = `<div class="empty">此分頁沒有資料</div>`; $("rowNote").textContent = ""; return; }
+  const head = s.aoa[0], W = head.length;
+  // hide columns that are empty in the whole preview (e.g. AY~BG spacers)
+  const show = head.map((h, j) => String(h ?? "").trim() !== "" || rows.some(r => String(r[j] ?? "").trim() !== ""));
+  let h = "<table><thead><tr>" + head.map((x, j) => show[j] ? `<th class="${sop.has(j) ? "sop" : ""}" title="${COL(j)}">${esc(x instanceof Date ? fmtD(x) : x)}</th>` : "").join("") + "</tr></thead><tbody>";
+  rows.forEach((row, i) => {
+    h += "<tr>";
+    for (let j = 0; j < W; j++){ if (!show[j]) continue;
+      let v = row[j] ?? ""; if (v instanceof Date) v = fmtD(v);
+      const isNum = typeof v === "number";
+      let inner = esc(isNum ? (Number.isInteger(v) ? v.toLocaleString("en-US") : v.toLocaleString("en-US", {maximumFractionDigits:6})) : v);
+      if (j === s.statusCol && v !== "") inner = `<span class="pill ${/REJECT/i.test(v) ? "r" : /ACCEPT/i.test(v) ? "a" : "na"}">${esc(v)}</span>`;
+      const cls = (isNum ? "num" : "") + (neg.has((i + 1) + ":" + j) ? " hl" : fx.has((i + 1) + ":" + j) ? " fx" : "");
+      h += `<td class="${cls}" title="${esc(v)}">${inner}</td>`; }
+    h += "</tr>";
+  });
+  $("tableWrap").innerHTML = h + "</tbody></table>";
+  $("rowNote").textContent = s.aoa.length - 1 > LIMIT ? `預覽前 ${LIMIT} 筆，共 ${(s.aoa.length - 1).toLocaleString()} 筆，完整資料請下載 Excel` : "";
+}
+
+/* ---------- downloads ---------- */
+const inClaude = !!(window.claude && window.claude.use);
+let dlCap = null;
+if (inClaude) (async () => { try{ dlCap = await window.claude.use("downloads"); }catch(e){} })();
+let lastUrl = null;
+/* Plain websites: download inside the click, and leave a visible link as a backup. */
+function directDownload(filename, blob){
+  if (lastUrl) URL.revokeObjectURL(lastUrl);
+  lastUrl = URL.createObjectURL(blob);
+  if (window.navigator && window.navigator.msSaveOrOpenBlob){ window.navigator.msSaveOrOpenBlob(blob, filename); }
+  else { const a = document.createElement("a"); a.href = lastUrl; a.download = filename; a.rel = "noopener";
+    document.body.appendChild(a); a.click(); a.remove(); }
+  const st = $("dlStatus"); st.textContent = "";
+  st.append("已開始下載。沒看到檔案的話，請點：");
+  const link = document.createElement("a"); link.href = lastUrl; link.download = filename; link.textContent = filename;
+  link.style.cssText = "color:var(--accent);font-weight:700;word-break:break-all"; st.append(link);
+  return null;
+}
+async function saveFile(filename, blob){
+  if (dlCap){
+    try{ await dlCap.save({filename, data:blob}); return "已下載"; }
+    catch(e){ if (e && e.code === "declined") return "已取消下載"; if (e && e.code === "rate_limited") return "下載視窗已開啟，請先完成或關閉它"; }
+  }
+  return directDownload(filename, blob);
+}
+const showDl = msg => { if (msg !== null) $("dlStatus").textContent = msg; };
+const cleanCell = v => {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "number") return isFinite(v) ? v : "";
+  if (typeof v === "boolean" || v instanceof Date) return v;
+  const s = typeof v === "object" ? (v.w || v.v || JSON.stringify(v)) : String(v);
+  return String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").slice(0, 32000);
+};
+const FILL = rgb => ({patternType:"solid", fgColor:{rgb}});
+let xlsxSkipped = [];
+function buildXlsx(){
+  const wb = XLSX.utils.book_new(), used = new Set(); xlsxSkipped = [];
+  for (const s of result.sheets){
+   try{
+    const ws = XLSX.utils.aoa_to_sheet(s.aoa.map(r => Array.from(r, cleanCell)), {dateNF:"yyyy/mm/dd"});
+    const red = new Set(s.red || []);
+    s.aoa[0].forEach((_, c) => { const a = XLSX.utils.encode_cell({r:0, c}); if (!ws[a]) return;
+      ws[a].s = {font:{bold:true}, fill:FILL(red.has(c) ? "FF0000" : (s.sop || []).includes(c) ? "FFFF00" : "DCE3F2")}; });
+    if (s.f) for (const [k, f] of s.f){ const [r, c] = k.split(":").map(Number); const a = XLSX.utils.encode_cell({r, c});
+      const cell = ws[a] || (ws[a] = {t:"n", v:0});
+      if (cell.v === "#N/A"){ cell.t = "e"; cell.v = 0x2A; cell.w = "#N/A"; }
+      cell.f = f; }
+    for (const [r, c] of (s.fx || [])){ const a = XLSX.utils.encode_cell({r, c}); if (!ws[a]) ws[a] = {t:"s", v:""}; ws[a].s = {...(ws[a].s || {}), fill:FILL("FCD5B4")}; }
+    for (const [r, c] of (s.neg || [])){ const a = XLSX.utils.encode_cell({r, c}); if (!ws[a]) ws[a] = {t:"s", v:""}; ws[a].s = {...(ws[a].s || {}), fill:FILL("FFFF00")}; }
+    ws["!cols"] = s.aoa[0].map((h, c) => ({wch: Math.min(40, Math.max(8, String(h ?? "").length + 2, ...s.aoa.slice(1, 50).map(r => String(r[c] ?? "").length + 1)))}));
+    ws["!freeze"] = {xSplit:0, ySplit:1};
+    const base = (String(s.name).replace(/[\\\/?*\[\]:']/g, "_").trim() || "Sheet").slice(0, 31);
+    let n = base, i = 2; while (used.has(n.toUpperCase())) n = base.slice(0, 27) + "_" + i++; used.add(n.toUpperCase());
+    XLSX.utils.book_append_sheet(wb, ws, n);
+   }catch(e){ console.error("[dar] sheet failed:", s.name, e); xlsxSkipped.push(`${s.name}（${e.message || e}）`); }
+  }
+  if (!wb.SheetNames.length) throw new Error("所有分頁都無法寫入：" + xlsxSkipped.join("；"));
+  return XLSX.write(wb, {bookType:"xlsx", type:"array", compression:true});
+}
+const toCsv = aoa => "﻿" + aoa.map(r => r.map(v => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }).join(",")).join("\r\n");
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+/* Build files right after processing, so a click only hands over a finished file. */
+let ready = {xlsx:null, zip:null, xlsxErr:null, zipErr:null, token:0};
+async function prepareDownloads(){
+  const token = ++ready.token;
+  ready = {xlsx:null, zip:null, xlsxErr:null, zipErr:null, token};
+  const bx = $("dlXlsx"), bc = $("dlCsv");
+  bx.disabled = true; bx.textContent = "⏳ 產生 Excel 檔中…";
+  bc.disabled = true; bc.textContent = result.csvs.length ? "⏳ 產生 CSV 檔中…" : "無需產生 CSV";
+  $("dlStatus").textContent = `共 ${result.kpi.total.toLocaleString()} 筆，資料量大時需要幾秒鐘，請稍候。`;
+  await new Promise(r => setTimeout(r, 60));
+  try{ const x = new Blob([buildXlsx()], {type:XLSX_MIME}); if (token !== ready.token) return; ready.xlsx = x; }
+  catch(e){ console.error(e); ready.xlsxErr = e; }
+  if (result.csvs.length){
+    try{ if (!window.JSZip) throw new Error("ZIP 元件沒有載入成功，請重新整理頁面");
+      const zip = new JSZip(); result.csvs.forEach(c => zip.file(c.name, toCsv(c.aoa)));
+      const z = new Blob([await zip.generateAsync({type:"uint8array"})], {type:"application/zip"});
+      if (token !== ready.token) return; ready.zip = z; }
+    catch(e){ console.error(e); ready.zipErr = e; }
+  }
+  if (token !== ready.token) return;
+  bx.disabled = !ready.xlsx; bx.textContent = ready.xlsx ? `⬇ 下載 Excel 結果（${Math.max(1, Math.round(ready.xlsx.size / 1024)).toLocaleString()} KB）` : "Excel 產生失敗";
+  if (result.csvs.length){ bc.disabled = !ready.zip; bc.textContent = ready.zip ? `⬇ 下載 CSV 檔（${result.csvs.length} 個，ZIP）` : "CSV 產生失敗"; }
+  $("dlStatus").textContent = ready.xlsxErr ? "產生 Excel 失敗：" + (ready.xlsxErr.message || ready.xlsxErr)
+    : ready.zipErr ? "產生 CSV 失敗：" + (ready.zipErr.message || ready.zipErr)
+    : xlsxSkipped.length ? "檔案已準備好，但以下分頁無法寫入：" + xlsxSkipped.join("；") : "檔案已準備好，可以下載。";
+}
+$("dlXlsx").onclick = async () => { if (!result || !ready.xlsx) return;
+  try{ showDl(await saveFile(`CLAIM_RESPOND_ALLTEK_TW_重新申請_${result.todayS}.xlsx`, ready.xlsx)); }
+  catch(e){ console.error(e); $("dlStatus").textContent = "下載失敗：" + (e.message || e); } };
+$("dlCsv").onclick = async () => { if (!result || !ready.zip) return;
+  try{ showDl(await saveFile(`Rebate_cost_CSV_${result.todayS}.zip`, ready.zip)); }
+  catch(e){ console.error(e); $("dlStatus").textContent = "下載失敗：" + (e.message || e); } };
+
+/* ---------- sample data (clearly marked as 範例) ---------- */
+function sampleFiles(){
+  const d = (y, m, dd) => new Date(y, m - 1, dd);
+  const tplH = ["Distributor Name/ID","Invoice Date","Invoice Number","Invoice Item Number","Part Number","Quantity","Disti Purchase Price","DistiCost","DistiResale","Resale Extension","Ship/Debit Claim Number","Diodes Invoice Number (Header)","Ship to Customer Name","End Customer Name"];
+  const T = (dt, no, it, pn, q, up, dc, rs, deb, inv, cu, ec) => ["ALLTEK", dt, no, it, pn, q, up, dc, rs, +(q * rs).toFixed(2), deb, inv, cu, ec];
+  const tpl = [tplH, ["Required","Required","Required","Required","Required","Required","Required","Required","Required","Optional","Conditional Required","Conditional Required","Required","Required"],
+    T(d(2026,3,5),"ZB10001",101,"AP2301-7",3000,0.052,0.045,0.08,"D2401001",6100120001,"範例客戶A","範例客戶A"),
+    T(d(2026,3,9),"ZB10002",102,"BAT54C-7-F",6000,0.012,0.009,0.02,"D2401004",6100120002,"範例客戶B","範例客戶B"),
+    T(d(2026,3,11),"ZB10003",103,"74LVC1G08SE",2000,0.031,0.026,0.05,"D2401002","SX4220001","範例客戶B","範例終端-舊"),
+    T(d(2026,3,14),"ZB10004",104,"DMN3404L-7",4000,0.041,0.035,0.07,"D2401003","SX4220002","範例客戶C","範例客戶C"),
+    T(d(2026,3,18),"ZB10005",105,"BAT54C-7-F",5000,0.012,0.010,0.02,"D2309001","SX4220003","範例客戶A","範例客戶A"),
+    T(d(2026,3,20),"ZB10006",106,"ZXMS6004FF",1500,0.18,0.15,0.26,"D2310002","SX4220004","範例客戶D","範例客戶D"),
+    T(d(2026,3,22),"ZB10007",107,"AP2301-7",9000,0.052,0.045,0.08,"D2401001","SX4220005","範例客戶A","範例客戶A"),
+    T(d(2026,3,25),"ZB10008",108,"74LVC1G08SE",9000,0.031,0.026,0.05,"D2401002","SX4220006","範例客戶B","範例客戶B"),
+    T(d(2026,3,26),"ZB10009",109,"DMN3404L-7",2500,0.041,0.035,0.07,"D2402005","SX4220007","範例客戶C","範例客戶C"),
+    T(d(2026,3,27),"ZB10010",110,"BAT54C-7-F",2000,0.012,0.0095,0.02,"D2401004","SX4220008","範例客戶B","範例客戶B"),
+    T(d(2026,4,2),"ZB10011",111,"DMN3404L-7",3500,0.041,0.035,0.07,"D2401003",6100120010,"範例客戶C","範例客戶C"),
+    T(d(2026,4,6),"ZB10012",112,"ZXMS6004FF",800,0.18,0.15,0.26,"D2310002","SX4220009","範例客戶D","範例終端E"),
+    T(d(2026,4,9),"ZB10013",113,"AP2301-7",1000,0.052,0.045,0.08,"D2401001","SX4220010","範例客戶A","範例客戶A")];
+  const rH = ["Distributor","Status","Claim Num","Debit Num","Rejected Message","Comments","Reject Code","Ship Qty","Mpn","Pos Invoice","Ship Date","Ship_Month","Total_Claim"];
+  const Rr = (st, deb, msg, cmt, code, q, pn, no, it, sd, sm) => ["ALLTEK", st, "C20260901", deb, msg, cmt, code, q, pn, `${no}_${it}`, sd, sm, 0];
+  const rsp = [rH,
+    Rr("Accepted","D2401001","","","",3000,"AP2301-7","ZB10001",101,20260305,202603),
+    Rr("Accepted","D2401004","","","",6000,"BAT54C-7-F","ZB10002",102,20260309,202603),
+    Rr("Rejected","D2401002","End customer does not match the one in Debit","pls apply new debit# with correct end customer name.","BAD_END_CUST_FOR_DEBIT;",2000,"74LVC1G08SE","ZB10003",103,20260311,202603),
+    Rr("Rejected","D2401003","Rejected by user","Customer does not match the one in Debit.","BAD_DEBIT_CUSTOMER;",4000,"DMN3404L-7","ZB10004",104,20260314,202603),
+    Rr("Rejected","D2309001","Disti ship date is after expiration date for Debit.","Please extend the debit expire date","BAD_SHIP_DATE;",5000,"BAT54C-7-F","ZB10005",105,20260318,202603),
+    Rr("Rejected","D2310002","Disti ship date is after expiration date for Debit.","pls apply new debit#.","BAD_SHIP_DATE;",1500,"ZXMS6004FF","ZB10006",106,20260320,202603),
+    Rr("Rejected","D2401001","Rejected by user","Diodes invoice QTY/Amount is not enough for this claim.","OTHER_REASON;",9000,"AP2301-7","ZB10007",107,20260322,202603),
+    Rr("Rejected","D2401002","Rejected by user","DBC does not match to Diodes invoice unit price.","OTHER_REASON;",9000,"74LVC1G08SE","ZB10008",108,20260325,202603),
+    Rr("Rejected","D2402005","Shipped quantity is greater than the remaining quantity.","pls extend the debit open QTY.","BAD_QUANTITY;",2500,"DMN3404L-7","ZB10009",109,20260326,202603),
+    Rr("Rejected","D2401004","Disti cost is out of tolerance.","pls confirm the DBC & DC.","BAD_DISTI_COST;",2000,"BAT54C-7-F","ZB10010",110,20260327,202603),
+    Rr("Accepted","D2401003","","","",3500,"DMN3404L-7","ZB10011",111,20260402,202604),
+    Rr("Rejected","D2310002","Disti ship date is after expiration date for Debit.","Extend debit# expire date or request for new debit#","BAD_SHIP_DATE;",800,"ZXMS6004FF","ZB10012",112,20260406,202604)];
+  const dH = ["Item Status","Debit #","Created Date","Debit_Start_Date","Debit Customer","Debit End Customer","Debit MPN","Authorized_Qty","Quantity Shipped","Debit_Item_Expire_Date","Debit Cost","Debit Distributor Book Cost"];
+  const deb = [dH,
+    ["Authorized","D2401001",d(2026,1,5),d(2026,1,1),"範例客戶A","範例客戶A","AP2301-7",50000,12000,d(2026,12,31),0.045,0.052],
+    ["Authorized","D2401002",d(2026,1,8),d(2026,1,1),"範例客戶B","範例客戶B","74LVC1G08SE",20000,2000,d(2026,12,31),0.026,0.031],
+    ["Authorized","D2401003",d(2026,1,9),d(2026,1,1),"範例客戶X","範例客戶X","DMN3404L-7",10000,0,d(2026,12,31),0.035,0.041],
+    ["Authorized","D2402005",d(2026,2,3),d(2026,2,1),"範例客戶C","範例客戶C","DMN3404L-7",30000,29000,d(2026,12,31),0.034,0.041],
+    ["Authorized","D2403006",d(2026,3,1),d(2026,3,1),"範例客戶C","範例客戶C","DMN3404L-7",10000,0,d(2026,12,31),0.036,0.041],
+    ["Authorized","D2401004",d(2026,1,10),d(2026,1,1),"範例客戶B","範例客戶B","BAT54C-7-F",40000,6000,d(2026,12,31),0.009,0.012],
+    ["Expired","D2309001",d(2025,9,1),d(2025,9,1),"範例客戶A","範例客戶A","BAT54C-7-F",40000,10000,d(2026,2,28),0.010,0.012],
+    ["Authorized","D2405007",d(2026,2,20),d(2026,2,20),"範例客戶A","範例客戶A","BAT54C-7-F",50000,0,d(2027,2,28),0.0095,0.012],
+    ["Expired","D2310002",d(2025,10,5),d(2025,10,1),"範例客戶D","範例客戶D","ZXMS6004FF",12000,3000,d(2026,1,31),0.15,0.18],
+    ["Expired","D2311003",d(2025,12,15),d(2025,12,1),"範例客戶D","範例客戶D","ZXMS6004FF",18000,0,d(2026,2,28),0.15,0.18]];
+  const pH = ["P+D","Part No","Delivery No","Ship From","SHIP DATE","Unit Price","Ship Qty",d(2026,3,1),d(2026,4,1),"GAP"];
+  const Pp = (pn, dn, sd, up, q, mar, gap) => [pn + dn, pn, dn, "DTI", sd, up, q, mar, "", gap];
+  const pop = [pH,
+    Pp("AP2301-7",6100110001,d(2023,4,10),0.052,10000,"",1200),
+    Pp("AP2301-7",6100110002,d(2024,6,3),0.052,12000,"",8000),
+    Pp("AP2301-7",6100120001,d(2025,11,20),0.052,15000,3000,4000),
+    Pp("74LVC1G08SE",6100110010,d(2024,2,14),0.031,10000,"",5000),
+    Pp("74LVC1G08SE",6100110011,d(2025,5,2),0.031,8000,"",2500),
+    Pp("74LVC1G08SE",6100110012,d(2025,8,9),0.029,9000,"",6000),
+    Pp("BAT54C-7-F",6100120002,d(2025,12,1),0.012,20000,6000,5000),
+    Pp("DMN3404L-7",6100120010,d(2026,1,15),0.041,10000,"",3000)];
+  const mk = (name, sheetsAoa) => { const wb = XLSX.utils.book_new();
+    for (const [sn, aoa] of sheetsAoa) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), sn);
+    const buf = XLSX.write(wb, {bookType:"xlsx", type:"array"});
+    return {name, size:buf.byteLength, role:"auto", tables:analyzeSheets(parseBook(buf)), sample:true}; };
+  return [mk("範例_CLAIM_RESPOND_ALLTEK TW.xlsx", [["Excel Template", tpl], ["RESPOND", rsp]]),
+    mk("範例_debit report.xlsx", [["Report", deb]]),
+    mk("範例_ALLTEK POP FOR REBATE.xlsx", [["扣數(New)", pop]])];
+}
+$("sampleBtn").onclick = () => { files = sampleFiles(); renderFiles(); $("runBtn").click(); };
+
+if (window.XLSX){ files = sampleFiles(); renderFiles(); $("runBtn").click(); }
+else setStatus("Excel 處理元件載入失敗，請重新整理頁面。", true);
+})();
+</script>
+
+</body>
+</html>
